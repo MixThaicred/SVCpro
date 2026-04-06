@@ -16,7 +16,7 @@
         body { background-color: var(--ops-bg); color: #f8fafc; font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; }
         .ops-glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
         
-        /* Video Grid Logic */
+        /* Responsive Grid */
         #video-grid { display: grid; gap: 1rem; padding: 1rem; height: 100%; width: 100%; transition: all 0.3s ease; }
         .video-container { position: relative; border-radius: 1rem; overflow: hidden; background: #000; border: 1px solid #1e293b; }
         .video-container.host { border: 2px solid var(--ops-blue); box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
@@ -24,7 +24,6 @@
         #local-video { transform: scaleX(-1); }
 
         .control-dock { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 1rem; padding: 0.75rem 1.5rem; border-radius: 1.5rem; border: 1px solid rgba(255,255,255,0.1); }
-        
         .rec-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: blink 1.5s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
@@ -35,10 +34,10 @@
         <div class="flex items-center gap-4">
             <div class="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center font-black shadow-lg">SO</div>
             <div>
-                <h1 class="text-xl font-black italic tracking-tighter uppercase">STRIVE<span class="text-blue-500">-OPS</span></h1>
-                <div class="flex items-center gap-2">
+                <h1 class="text-xl font-black italic tracking-tighter uppercase leading-none">STRIVE<span class="text-blue-500">-OPS</span></h1>
+                <div class="flex items-center gap-2 mt-1">
                     <div class="rec-dot"></div>
-                    <p id="my-id" class="text-[10px] font-mono text-gray-500 font-bold uppercase tracking-widest">INITIALIZING NODE...</p>
+                    <p id="my-id" class="text-[9px] font-mono text-gray-500 font-bold uppercase tracking-widest">INITIALIZING...</p>
                 </div>
             </div>
         </div>
@@ -52,18 +51,20 @@
     </header>
 
     <main class="flex flex-grow overflow-hidden">
-        
-        <aside class="w-72 ops-glass border-r border-gray-800 flex flex-col overflow-hidden">
-            <div class="p-5 border-b border-gray-800">
-                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-4">Hardware</h3>
+        <aside class="w-72 ops-glass border-r border-gray-800 flex flex-col p-5 space-y-6">
+            <div>
+                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Hardware</h3>
                 <select id="video-source" class="w-full bg-gray-900 border border-gray-800 rounded p-2 text-[10px] text-gray-400 mb-2" onchange="getMedia()"></select>
                 <select id="audio-source" class="w-full bg-gray-900 border border-gray-800 rounded p-2 text-[10px] text-gray-400" onchange="getMedia()"></select>
             </div>
-
-            <div class="flex-grow flex flex-col p-5 overflow-hidden">
-                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Ops Chat</h3>
-                <div id="chat-box" class="flex-grow overflow-y-auto space-y-3 text-[10px] mb-4"></div>
-                <input type="text" id="chat-input" placeholder="Broadcast to team..." class="bg-black bg-opacity-40 border border-gray-800 rounded-lg p-3 text-[10px] outline-none focus:border-blue-500 w-full">
+            <div>
+                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Experts Online</h3>
+                <div id="member-list" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
+            </div>
+            <div class="flex-grow flex flex-col overflow-hidden">
+                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Team Chat</h3>
+                <div id="chat-box" class="flex-grow overflow-y-auto space-y-3 text-[10px] mb-4 pr-2"></div>
+                <input type="text" id="chat-input" placeholder="Broadcast..." class="bg-black bg-opacity-40 border border-gray-800 rounded p-3 text-[10px] w-full outline-none focus:border-blue-500">
             </div>
         </aside>
 
@@ -93,7 +94,7 @@
             const id = document.getElementById('my-id').innerText.split(': ')[1];
             if(!id || id === "INITIALIZING...") return;
             const link = `${window.location.origin}${window.location.pathname}?join=${id}`;
-            navigator.clipboard.writeText(link).then(() => alert("Invite Link Copied."));
+            navigator.clipboard.writeText(link).then(() => alert("Strive-Ops Link Copied."));
         }
     </script>
 </body>
