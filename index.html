@@ -3,130 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strive Video Center (SVC) | Pro Edition</title>
+    <title>Strive Video Center | SVC Pro</title>
     
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
     
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
     <style>
-        :root { --svc-blue: #3b82f6; --panel-bg: rgba(17, 24, 39, 0.8); }
-        body { background: radial-gradient(circle at top right, #0d1117, #05070a); color: #f8fafc; font-family: 'Inter', sans-serif; }
-        
-        .glass { background: var(--panel-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; }
-        
-        video { 
-            width: 100%; border-radius: 1.25rem; background: #000;
-            transform: scaleX(-1); transition: all 0.3s ease;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-        }
+        :root { --svc-blue: #3b82f6; --panel-bg: rgba(17, 24, 39, 0.85); }
+        body { background: radial-gradient(circle at top right, #0d1117, #05070a); color: #f8fafc; font-family: 'Inter', sans-serif; min-height: 100vh; }
+        .glass { background: var(--panel-bg); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.5rem; }
+        video { width: 100%; border-radius: 1.25rem; background: #000; transform: scaleX(-1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         #remote-video { transform: none; } 
-
-        #transcript-box::-webkit-scrollbar { width: 4px; }
-        #transcript-box::-webkit-scrollbar-thumb { background: var(--svc-blue); border-radius: 10px; }
-
-        .btn-svc { @apply bg-gray-800 hover:bg-gray-700 p-2 rounded text-[10px] font-bold transition-all border border-transparent uppercase tracking-tighter; }
+        .btn-svc { @apply bg-gray-800 hover:bg-gray-700 p-2 rounded text-[10px] font-bold transition-all border border-transparent uppercase tracking-widest; }
         .btn-svc-active { border-color: var(--svc-blue); background-color: #1e3a8a !important; }
-
         .online-pulse { animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
     </style>
 </head>
-<body class="p-4 lg:p-10 min-h-screen">
+<body class="p-4 lg:p-10">
 
-    <div id="lobby-overlay" class="fixed inset-0 bg-black bg-opacity-95 z-50 flex flex-col items-center justify-center hidden text-center">
-        <div class="glass p-12 max-w-sm mx-auto border-2 border-blue-900">
-            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto mb-6"></div>
-            <h2 class="text-2xl font-black mb-2 tracking-tight">SVC WAITING ROOM</h2>
-            <p class="text-gray-400 text-sm mb-6">Connecting to host. Please wait to be admitted.</p>
-            <div class="text-[9px] uppercase tracking-[0.3em] text-blue-500 font-bold">Strive for Excellence</div>
+    <div id="lobby-overlay" class="fixed inset-0 bg-black bg-opacity-95 z-50 flex flex-col items-center justify-center hidden">
+        <div class="glass p-12 text-center border-2 border-blue-900">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mx-auto mb-6"></div>
+            <h2 class="text-2xl font-black mb-2 uppercase">SVC Lobby</h2>
+            <p class="text-gray-400 text-sm">Stand by for host admission...</p>
         </div>
     </div>
 
     <div class="max-w-7xl mx-auto space-y-8">
-        
-        <header class="flex flex-col lg:flex-row justify-between items-center gap-6 glass p-6">
+        <header class="flex flex-col lg:flex-row justify-between items-center gap-6 glass p-8">
             <div class="text-center lg:text-left">
-                <h1 class="text-3xl font-black italic tracking-tighter"><span class="text-blue-500">STRIVE</span> VC</h1>
-                <p class="text-[10px] text-gray-500 font-mono mt-1 uppercase">Local Node: <span id="my-id" class="text-blue-400 select-all tracking-normal">Connecting...</span></p>
-                <button onclick="copyInvite()" class="mt-2 text-[9px] bg-blue-900 bg-opacity-30 text-blue-300 px-3 py-1 rounded-full hover:bg-opacity-50 transition font-bold uppercase tracking-widest">Copy Invite Link</button>
+                <h1 class="text-4xl font-black italic tracking-tighter text-blue-500">STRIVE VC</h1>
+                <p class="text-[10px] text-gray-500 font-mono mt-2">LOCAL ID: <span id="my-id" class="text-blue-300 font-bold">CONNECTING...</span></p>
+                <button onclick="copyInvite()" class="mt-3 text-[9px] bg-blue-900 bg-opacity-40 px-4 py-1.5 rounded-full hover:bg-blue-600 transition font-black uppercase tracking-[0.2em]">Copy Invite Link</button>
             </div>
-            
             <div class="flex gap-3 w-full lg:w-auto">
-                <input type="text" id="remote-id" placeholder="Enter Guest ID" 
-                    class="bg-black bg-opacity-40 border border-gray-800 rounded-xl px-5 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full lg:w-64">
-                <button onclick="startCall()" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold transition transform active:scale-95 shadow-lg">
-                    Join Session
-                </button>
+                <input type="text" id="remote-id" placeholder="Paste Destination ID" class="bg-black bg-opacity-50 border border-gray-800 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full lg:w-72">
+                <button onclick="startCall()" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black transition transform active:scale-95 shadow-2xl uppercase text-xs tracking-widest">Connect</button>
             </div>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
             <div class="lg:col-span-3 space-y-6">
                 <div class="glass p-6">
                     <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Live Session</h3>
                     <div id="member-list" class="space-y-3">
-                        <div class="flex items-center p-3 rounded-xl bg-white bg-opacity-5 animate-pulse text-[10px] text-gray-500">
-                            Syncing with Network...
-                        </div>
+                        <div class="text-[10px] text-gray-600 italic">Syncing with Firebase...</div>
                     </div>
                 </div>
-
                 <div class="glass p-6">
-                    <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Visual Processor</h3>
-                    <div class="grid grid-cols-1 gap-2 mb-4">
-                        <button id="btn-none" onclick="setBgMode('none')" class="btn-svc btn-svc-active">Standard Camera</button>
-                        <button id="btn-blur" onclick="setBgMode('blur')" class="btn-svc">Privacy Blur</button>
+                    <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">AI Visuals</h3>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button id="btn-none" onclick="setBgMode('none')" class="btn-svc btn-svc-active">Standard</button>
+                        <button id="btn-blur" onclick="setBgMode('blur')" class="btn-svc">Blur</button>
                         <button id="btn-color" onclick="setBgMode('color')" class="btn-svc">SVC Blue</button>
-                        <button id="btn-image" onclick="document.getElementById('bg-upload').click()" class="btn-svc bg-blue-900 bg-opacity-40">Custom Image</button>
+                        <button id="btn-image" onclick="document.getElementById('bg-upload').click()" class="btn-svc bg-blue-900 bg-opacity-20">Custom</button>
                     </div>
                     <input type="file" id="bg-upload" accept="image/*" class="hidden" onchange="loadCustomBackground(event)">
-                    <div class="text-center p-2 bg-black bg-opacity-40 rounded-lg text-[8px] text-gray-500 font-bold uppercase tracking-widest" id="bg-status">
-                        Direct Feed Active
-                    </div>
+                    <p id="bg-status" class="text-[8px] text-center mt-3 text-gray-600 font-bold uppercase tracking-widest">Feed: Standard</p>
                 </div>
             </div>
 
             <div class="lg:col-span-6 space-y-6">
                 <div class="relative group">
-                    <video id="local-video" autoplay muted playsinline class="border-2 border-transparent group-hover:border-blue-500 transition-all"></video>
+                    <video id="local-video" autoplay muted playsinline></video>
                     <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4">
-                        <button id="toggle-mic" onclick="toggleMic()" class="bg-black bg-opacity-70 p-4 rounded-2xl hover:bg-blue-600 border border-gray-700 shadow-2xl transition">🎤</button>
-                        <button id="toggle-cam" onclick="toggleCam()" class="bg-black bg-opacity-70 p-4 rounded-2xl hover:bg-blue-600 border border-gray-700 shadow-2xl transition">📷</button>
+                        <button id="toggle-mic" onclick="toggleMic()" class="bg-black bg-opacity-80 p-5 rounded-2xl hover:bg-blue-600 border border-gray-800 transition">🎤</button>
+                        <button id="toggle-cam" onclick="toggleCam()" class="bg-black bg-opacity-80 p-5 rounded-2xl hover:bg-blue-600 border border-gray-800 transition">📷</button>
                     </div>
-                    <div class="absolute top-4 left-4 bg-blue-600 bg-opacity-80 px-3 py-1 rounded-full text-[8px] font-black tracking-widest">LOCAL AI FEED</div>
                 </div>
-
-                <div class="relative">
-                    <video id="remote-video" autoplay playsinline class="border border-gray-800"></video>
-                    <div class="absolute top-4 left-4 bg-gray-800 bg-opacity-80 px-3 py-1 rounded-full text-[8px] font-black tracking-widest">REMOTE PARTICIPANT</div>
-                </div>
+                <video id="remote-video" autoplay playsinline class="border border-gray-900 shadow-inner"></video>
             </div>
 
             <div class="lg:col-span-3">
-                <div class="glass flex flex-col h-full overflow-hidden border border-gray-800 shadow-2xl">
-                    <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-800 bg-opacity-40">
-                        <h3 class="font-black text-[10px] text-blue-400 tracking-[0.2em] uppercase">AI Analytics</h3>
-                        <span id="ai-status" class="text-[8px] bg-black px-2 py-1 rounded text-gray-500 font-bold border border-gray-800 uppercase tracking-tighter">Offline</span>
+                <div class="glass flex flex-col h-full overflow-hidden shadow-2xl">
+                    <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-900 bg-opacity-50">
+                        <h3 class="font-black text-[10px] text-blue-400 tracking-widest uppercase">AI Transcript</h3>
+                        <span id="ai-status" class="text-[8px] bg-black px-2 py-1 rounded text-gray-500 font-bold border border-gray-800 uppercase">Offline</span>
                     </div>
-                    
-                    <div id="transcript-box" class="flex-grow p-5 overflow-y-auto h-[500px] space-y-4">
-                        <div class="text-center mt-20 opacity-20">
-                            <p class="text-[10px] font-bold uppercase tracking-[0.2em] leading-loose">Awaiting Session<br>Audio Data...</p>
-                        </div>
+                    <div id="transcript-box" class="flex-grow p-6 overflow-y-auto h-[500px] space-y-4">
+                        <p class="text-center text-gray-700 text-[10px] mt-20 uppercase font-black opacity-20 tracking-tighter">Awaiting Audio Stream</p>
                     </div>
-
-                    <div class="p-5 bg-gray-800 bg-opacity-30">
-                        <button id="trans-btn" onclick="startTranscription()" 
-                            class="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black text-[10px] tracking-widest transition uppercase shadow-xl transform active:scale-95">
-                            Start Session Analysis
-                        </button
+                    <div class="p-5">
+                        <button id="trans-btn" onclick="startTranscription()" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-black text-[10px] tracking-widest transition uppercase shadow-xl">Enable Analysis</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
