@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Strive-Ops | Operations Command Center</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -15,9 +16,19 @@
         body { background-color: var(--ops-bg); color: #f8fafc; font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; }
         .ops-glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
         
-        /* THE GALLERY GRID: Forces side-by-side when more than one child exists */
-        #video-grid { display: grid; gap: 1rem; padding: 1rem; height: 100%; width: 100%; grid-template-columns: repeat(1, minmax(0, 1fr)); }
-        #video-grid.side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        /* FIXED GALLERY GRID */
+        #video-grid { 
+            display: grid; 
+            gap: 1rem; 
+            padding: 1rem; 
+            height: 100%; 
+            width: 100%; 
+            grid-template-columns: 1fr; /* Default: Single Column */
+        }
+        /* This class is added via JavaScript when a second person joins */
+        #video-grid.side-by-side { 
+            grid-template-columns: 1fr 1fr !important; 
+        }
         
         .video-container { position: relative; border-radius: 1rem; overflow: hidden; background: #000; border: 1px solid #1e293b; height: 100%; }
         video { width: 100%; height: 100%; object-fit: cover; }
@@ -33,7 +44,7 @@
             <p id="my-id" class="text-[9px] font-mono text-gray-500 font-bold uppercase tracking-widest">INITIALIZING...</p>
         </div>
         <div class="flex gap-4">
-            <input type="text" id="remote-id" placeholder="EXPERT ID" class="bg-black bg-opacity-40 border border-gray-800 rounded px-3 py-1 text-xs outline-none w-32 py-2">
+            <input type="text" id="remote-id" placeholder="EXPERT ID" class="bg-black bg-opacity-40 border border-gray-800 rounded px-3 py-1 text-xs outline-none w-32">
             <button onclick="startCall()" class="bg-blue-600 text-[10px] font-black uppercase px-4 py-2 rounded">Connect</button>
         </div>
     </header>
@@ -63,8 +74,8 @@
     <nav class="control-dock ops-glass shadow-2xl">
         <button onclick="toggleMic()" class="bg-gray-800 p-3 rounded-full hover:bg-blue-600 transition">🎤</button>
         <button onclick="toggleCam()" class="bg-gray-800 p-3 rounded-full hover:bg-blue-600 transition">📷</button>
-        <button onclick="setBgMode('blur')" class="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Blur</button>
-        <button onclick="toggleScreenShare()" class="bg-purple-600 px-6 py-3 rounded-xl font-black text-[9px] uppercase">Share</button>
+        <button onclick="setBgMode('blur')" class="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest">Blur</button>
+        <button onclick="toggleScreenShare()" class="bg-purple-600 px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest">Share Screen</button>
     </nav>
 
     <script src="app.js"></script>
