@@ -3,38 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strive-Ops</title>
-
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
+    <title>Strive-Ops | Command Center</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
     <style>
-        body { background: #020617; color: white; }
-        video { width: 100%; border-radius: 10px; background: black; }
-        #local-video { transform: scaleX(-1); }
+        :root { --ops-blue: #3b82f6; --ops-bg: #020617; }
+        body { background-color: var(--ops-bg); color: white; font-family: ui-sans-serif, system-ui; overflow: hidden; height: 100vh; }
+        
+        /* THE GRID: This is the logic you needed */
+        #video-grid { 
+            display: grid; 
+            gap: 1rem; 
+            padding: 1rem; 
+            width: 100%; 
+            height: 100%;
+            grid-template-columns: 1fr; /* Single by default */
+        }
+        /* When more than 1 person is in, we force 2 columns */
+        #video-grid.active-session { 
+            grid-template-columns: 1fr 1fr !important; 
+        }
+
+        .video-box { position: relative; background: #000; border-radius: 1rem; overflow: hidden; border: 1px solid #1e293b; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #local-video { transform: scaleX(-1); } /* Mirror effect for host */
+        
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
+<body class="flex flex-col h-screen">
 
-<body class="p-6">
-
-    <h1 class="text-xl mb-4">Strive-Ops Coaching</h1>
-
-    <div class="flex gap-4 mb-4">
-        <span id="my-id">Connecting...</span>
-        <input id="remote-id" placeholder="Remote ID" class="text-black px-2">
-        <button onclick="startCall()" class="bg-blue-600 px-4">Connect</button>
+    <div id="lobby" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden items-center justify-center">
+        <div class="bg-slate-900 border border-blue-500 p-10 rounded-3xl text-center shadow-2xl">
+            <h2 class="text-2xl font-black uppercase italic mb-6">Expert Knocking...</h2>
+            <button onclick="admitExpert()" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-bold uppercase tracking-widest transition-all">Admit to Ops</button>
+        </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
-        <video id="local-video" autoplay muted playsinline></video>
-        <video id="remote-video" autoplay playsinline></video>
-    </div>
+    <header class="glass p-4 flex justify-between items-center z-10">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-black italic tracking-tighter">STRIVE<span class="text-blue-500">-OPS</span></h1>
+            <p id="my-id" class="text-[10px] font-mono text-blue-400 bg-blue-400/10 px-2 py-1 rounded">BOOTING...</p>
+        </div>
+        <div class="flex gap-2">
+            <input type="text" id="target-id" placeholder="PASTE EXPERT ID" class="bg-black/50 border border-slate-700 rounded px-3 py-2 text-xs outline-none w-48 focus:border-blue-500">
+            <button onclick="connectToExpert()" class="bg-blue-600 px-6 py-2 rounded text-[10px] font-bold uppercase hover:bg-blue-500">Connect</button>
+        </div>
+    </header>
+
+    <main class="flex flex-grow overflow-hidden">
+        <aside class="w-64 glass border-r border-slate-800 flex flex-col p-4 space-y-6">
+            <div>
+                <h3 class="text-[9px] font-bold text-blue-500 uppercase tracking-widest mb-3">Live Chat</h3>
+                <div id="chat-box" class="h-64 overflow-y-auto text-[10px] space-y-2 mb-3 pr-2"></div>
+                <input type="text" id="chat-input" placeholder="Message team..." class="w-full bg-black/40 border border-slate-700 rounded p-2 text-[10px] outline-none">
+            </div>
+            <div class="pt-4 border-t border-slate-800">
+                <h3 class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-3">Hardware Status</h3>
+                <div class="text-[10px] text-green-400 flex items-center gap-2">● <span class="text-slate-300">Camera Active</span></div>
+            </div>
+        </aside>
+
+        <section class="flex-grow relative bg-slate-950">
+            <div id="video-grid">
+                <div class="video-box" id="host-slot">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <div class="absolute bottom-4 left-4 bg-blue-600 px-2 py-1 rounded text-[8px] font-bold uppercase">Lead: Luis</div>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <script src="config.js"></script>
-    <script src="app.js"></script>
+    <script>
+        /* ============================================================
+           STRIVE-OPS ENGINE v8.0 (FRESH BUILD)
+           ============================================================ */
 
+        // 1. Setup Infrastructure
+        if (!firebase.apps.length) firebase.initializeApp(STRIVE_CONFIG.firebase);
+        const chatRef = firebase.database().ref("strive-chat");
+        
+        let peer, localStream, pendingCall;
+        const grid = document.getElementById('video-grid');
+
+        // 2. Auto-Start Hardware
+        window.onload = async () => {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('local-video').srcObject = localStream;
+                initNetworking();
+            } catch (e) {
+                alert("Please allow camera access to start Strive-Ops.");
+            }
+        };
+
+        // 3. Networking Logic
+        function initNetworking() {
+            const myId = "so-" + Math.random().toString(36).substr(2, 5);
+            peer = new Peer(myId, { host: '0.peerjs.com', port: 443, secure: true });
+            
+            peer.on('open', (id) => {
+                document.getElementById('my-id').innerText = "NODE: " + id;
+            });
+
+            // Handle Incoming (Lobby)
+            peer.on('call', (call) => {
+                pendingCall = call;
+                document.getElementById('lobby').style.display = 'flex';
+            });
+        }
+
+        // 4. Admit Button Logic
+        function admitExpert() {
+            if (!pendingCall) return;
+            pendingCall.answer(localStream);
+            pendingCall.on('stream', (remoteStream) => {
+                displayRemote(remoteStream, pendingCall.peer);
+                document.getElementById('lobby').style.display = 'none';
+            });
+        }
+
+        // 5. Connect Button Logic (Caller)
+        function connectToExpert() {
+            const targetId = document.getElementById('target-id').value;
+            if (!targetId) return;
+            
+            const call = peer.call(targetId, localStream);
+            call.on('stream', (remoteStream) => {
+                displayRemote(remoteStream, targetId);
+            });
+        }
+
+        // 6. The Side-by-Side Injector
+        function displayRemote(stream, id) {
+            if (document.getElementById(`remote-${id}`)) return;
+
+            const box = document.createElement('div');
+            box.id = `remote-${id}`;
+            box.className = "video-box";
+            
+            const v = document.createElement('video');
+            v.srcObject = stream;
+            v.autoplay = true;
+            v.playsInline = true;
+            
+            box.appendChild(v);
+            grid.appendChild(box);
+            
+            // Force the 50/50 split
+            grid.classList.add('active-session');
+        }
+
+        // 7. Instant Chat Logic
+        document.getElementById('chat-input').onkeypress = (e) => {
+            if (e.key === 'Enter' && e.target.value.trim() !== "") {
+                chatRef.push({ user: "Luis", text: e.target.value });
+                e.target.value = "";
+            }
+        };
+
+        chatRef.limitToLast(10).on('child_added', (snap) => {
+            const msg = snap.val();
+            const div = document.createElement('div');
+            div.className = "p-2 bg-slate-800/50 rounded border border-slate-800";
+            div.innerHTML = `<span class="text-blue-400 font-bold">${msg.user}:</span> ${msg.text}`;
+            const box = document.getElementById('chat-box');
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        });
+
+    </script>
 </body>
 </html>
