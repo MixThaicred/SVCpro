@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Strive-Ops | Operations Command Center</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -14,39 +15,55 @@
         :root { --ops-blue: #3b82f6; --ops-bg: #020617; }
         body { background-color: var(--ops-bg); color: #f8fafc; font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; }
         .ops-glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
-        #video-grid { display: grid; gap: 1rem; padding: 1rem; height: 100%; width: 100%; }
+        
+        /* Video Grid Logic */
+        #video-grid { display: grid; gap: 1rem; padding: 1rem; height: 100%; width: 100%; transition: all 0.3s ease; }
         .video-container { position: relative; border-radius: 1rem; overflow: hidden; background: #000; border: 1px solid #1e293b; }
         .video-container.host { border: 2px solid var(--ops-blue); box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        video { width: 100%; height: 100%; object-fit: cover; image-rendering: -webkit-optimize-contrast; }
         #local-video { transform: scaleX(-1); }
+
         .control-dock { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 1rem; padding: 0.75rem 1.5rem; border-radius: 1.5rem; border: 1px solid rgba(255,255,255,0.1); }
+        
+        .rec-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
 <body class="flex flex-col h-screen">
 
     <header class="flex justify-between items-center px-8 py-4 ops-glass border-b border-gray-800">
         <div class="flex items-center gap-4">
-            <h1 class="text-xl font-black italic tracking-tighter uppercase">STRIVE<span class="text-blue-500">-OPS</span></h1>
-            <p id="my-id" class="text-[10px] font-mono text-gray-500 font-bold uppercase tracking-widest">INITIALIZING...</p>
+            <div class="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center font-black shadow-lg">SO</div>
+            <div>
+                <h1 class="text-xl font-black italic tracking-tighter uppercase">STRIVE<span class="text-blue-500">-OPS</span></h1>
+                <div class="flex items-center gap-2">
+                    <div class="rec-dot"></div>
+                    <p id="my-id" class="text-[10px] font-mono text-gray-500 font-bold uppercase tracking-widest">INITIALIZING NODE...</p>
+                </div>
+            </div>
         </div>
         <div class="flex gap-4">
-            <input type="text" id="remote-id" placeholder="EXPERT ID" class="bg-black bg-opacity-40 border border-gray-800 rounded px-3 py-1 text-xs outline-none w-32">
-            <button onclick="startCall()" class="bg-blue-600 text-[10px] font-black uppercase px-4 py-2 rounded">Connect</button>
-            <button onclick="copyInvite()" class="text-[9px] font-black uppercase text-gray-500 hover:text-white transition">Copy Link</button>
+            <div class="flex bg-black bg-opacity-40 border border-gray-800 rounded-lg px-2 items-center">
+                <input type="text" id="remote-id" placeholder="EXPERT ID" class="bg-transparent text-[10px] outline-none px-2 w-32 py-2">
+                <button onclick="startCall()" class="bg-blue-600 text-[9px] font-black uppercase px-4 py-1.5 rounded-md">Connect</button>
+            </div>
+            <button onclick="copyInvite()" class="text-[9px] font-black uppercase text-gray-400 hover:text-white transition">Copy Link</button>
         </div>
     </header>
 
     <main class="flex flex-grow overflow-hidden">
-        <aside class="w-72 ops-glass border-r border-gray-800 flex flex-col p-5 space-y-6">
-            <div>
-                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Hardware</h3>
+        
+        <aside class="w-72 ops-glass border-r border-gray-800 flex flex-col overflow-hidden">
+            <div class="p-5 border-b border-gray-800">
+                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-4">Hardware</h3>
                 <select id="video-source" class="w-full bg-gray-900 border border-gray-800 rounded p-2 text-[10px] text-gray-400 mb-2" onchange="getMedia()"></select>
                 <select id="audio-source" class="w-full bg-gray-900 border border-gray-800 rounded p-2 text-[10px] text-gray-400" onchange="getMedia()"></select>
             </div>
-            <div>
-                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Team Chat</h3>
-                <div id="chat-box" class="h-64 overflow-y-auto space-y-3 text-[10px] mb-3"></div>
-                <input type="text" id="chat-input" placeholder="Broadcast..." class="bg-black bg-opacity-40 border border-gray-800 rounded p-2 text-[10px] w-full outline-none">
+
+            <div class="flex-grow flex flex-col p-5 overflow-hidden">
+                <h3 class="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-3">Ops Chat</h3>
+                <div id="chat-box" class="flex-grow overflow-y-auto space-y-3 text-[10px] mb-4"></div>
+                <input type="text" id="chat-input" placeholder="Broadcast to team..." class="bg-black bg-opacity-40 border border-gray-800 rounded-lg p-3 text-[10px] outline-none focus:border-blue-500 w-full">
             </div>
         </aside>
 
@@ -54,18 +71,30 @@
             <div id="video-grid" class="grid-cols-1">
                 <div class="video-container host" id="container-local">
                     <video id="local-video" autoplay muted playsinline></video>
+                    <div class="absolute top-4 left-4 bg-blue-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">Lead: Luis</div>
                 </div>
             </div>
         </section>
     </main>
 
     <nav class="control-dock ops-glass shadow-2xl">
-        <button onclick="toggleMic()" class="bg-gray-800 p-3 rounded-full">🎤</button>
-        <button onclick="toggleCam()" class="bg-gray-800 p-3 rounded-full">📷</button>
-        <button onclick="setBgMode('blur')" class="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Blur</button>
-        <button onclick="toggleScreenShare()" class="bg-purple-600 px-6 py-3 rounded-xl font-black text-[9px] uppercase">Share</button>
+        <button onclick="toggleMic()" class="bg-gray-800 p-3 rounded-full hover:bg-blue-600 transition">🎤</button>
+        <button onclick="toggleCam()" class="bg-gray-800 p-3 rounded-full hover:bg-blue-600 transition">📷</button>
+        <div class="w-px h-6 bg-gray-700 mx-2"></div>
+        <button onclick="setBgMode('blur')" class="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest">Blur</button>
+        <button onclick="setBgMode('none')" class="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest">Off</button>
+        <div class="w-px h-6 bg-gray-700 mx-2"></div>
+        <button onclick="toggleScreenShare()" id="btn-share" class="bg-purple-600 px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-xl">Share Screen</button>
     </nav>
 
     <script src="app.js"></script>
+    <script>
+        function copyInvite() {
+            const id = document.getElementById('my-id').innerText.split(': ')[1];
+            if(!id || id === "INITIALIZING...") return;
+            const link = `${window.location.origin}${window.location.pathname}?join=${id}`;
+            navigator.clipboard.writeText(link).then(() => alert("Invite Link Copied."));
+        }
+    </script>
 </body>
 </html>
