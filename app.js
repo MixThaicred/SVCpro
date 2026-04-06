@@ -1,15 +1,8 @@
 /* ============================================================
-   STRIVE-OPS | MASTER BUILD v7.5
+   STRIVE-OPS | FINAL SYNC ENGINE
    ============================================================ */
 
-const firebaseConfig = {
-    apiKey: "AIzaSyA0gT_lJAxNDdlYHg7uiU6XUdqSPRgShvs",
-    authDomain: "strive-video-center.firebaseapp.com",
-    databaseURL: "https://strive-video-center-default-rtdb.firebaseio.com",
-    projectId: "strive-video-center"
-};
-
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) firebase.initializeApp(STRIVE_CONFIG.firebase);
 const db = firebase.database();
 const chatRef = db.ref("strive-ops-chat");
 const memberRef = db.ref("strive-ops-members");
@@ -25,14 +18,81 @@ window.onload = async () => {
     initNetworking();
 };
 
+/* --- 1. THE GRID INJECTOR --- */
+function addRemoteVideo(stream, peerId) {
+    console.log("Injecting Remote Video for:", peerId);
+    const grid = document.getElementById('video-grid');
+    
+    // Prevent duplicates
+    if (document.getElementById(`container-${peerId}`)) return;
+
+    const container = document.createElement('div');
+    container.id = `container-${peerId}`;
+    container.className = "video-container";
+    
+    const v = document.createElement('video');
+    v.srcObject = stream;
+    v.autoplay = true;
+    v.playsInline = true;
+    
+    container.appendChild(v);
+    grid.appendChild(container);
+    
+    // FORCE SPLIT VIEW
+    if (grid.children.length > 1) {
+        grid.classList.add('split');
+    }
+}
+
+/* --- 2. THE HANDSHAKE & LOBBY --- */
+function initNetworking() {
+    const id = "so-" + Math.random().toString(36).substr(2, 5);
+    peer = new Peer(id, { 
+        host: '0.peerjs.com', port: 443, secure: true,
+        config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
+    });
+    
+    peer.on('open', nid => {
+        document.getElementById('my-id').innerText = "NODE: " + nid;
+        memberRef.child(nid).set({ id: nid, online: true });
+        memberRef.child(nid).onDisconnect().remove();
+    });
+
+    peer.on('call', call => {
+        pendingCall = call;
+        document.getElementById('knocker-id').innerText = "ID: " + call.peer;
+        document.getElementById('lobby-gate').classList.replace('hidden', 'flex');
+    });
+}
+
+async function acceptExpert() {
+    if (!pendingCall) return;
+    const call = pendingCall;
+    activeCalls.set(call.peer, call);
+    
+    // Ensure we send our stream
+    call.answer(localStream);
+    
+    call.on('stream', r => {
+        addRemoteVideo(r, call.peer);
+        document.getElementById('lobby-gate').classList.replace('flex', 'hidden');
+    });
+}
+
+function startCall() {
+    const rId = document.getElementById('remote-id').value;
+    if(!rId || rId === peer.id) return;
+    const call = peer.call(rId, localStream);
+    activeCalls.set(rId, call);
+    call.on('stream', r => addRemoteVideo(r, rId));
+}
+
+/* --- 3. HARDWARE & AI --- */
 async function getMedia() {
     const vId = document.getElementById('video-source').value;
-    const aId = document.getElementById('audio-source').value;
-    if (localStream) localStream.getTracks().forEach(t => t.stop());
-
     const stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: vId ? {exact: vId} : undefined, width: 1280, height: 720 },
-        audio: { deviceId: aId ? {exact: aId} : undefined }
+        audio: true
     });
 
     selfieSegmentation = new SelfieSegmentation({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}` });
@@ -48,90 +108,6 @@ async function getMedia() {
     localStream = new MediaStream([track, stream.getAudioTracks()[0]]);
     document.getElementById('local-video').srcObject = localStream;
 }
-
-function initNetworking() {
-    const id = "so-" + Math.random().toString(36).substr(2, 5);
-    peer = new Peer(id, { 
-        host: '0.peerjs.com', port: 443, secure: true,
-        config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
-    });
-    
-    peer.on('open', nid => {
-        document.getElementById('my-id').innerText = "NODE: " + nid;
-        memberRef.child(nid).set({ id: nid, name: "Expert-" + nid.slice(-3), online: true });
-        memberRef.child(nid).onDisconnect().remove();
-    });
-
-    peer.on('call', call => {
-        pendingCall = call;
-        const gate = document.getElementById('lobby-gate');
-        document.getElementById('knocker-id').innerText = "Node: " + call.peer;
-        gate.classList.replace('hidden', 'flex');
-    });
-}
-
-function acceptExpert() {
-    if (!pendingCall) return;
-    const call = pendingCall;
-    activeCalls.set(call.peer, call);
-    call.answer(localStream);
-    call.on('stream', r => {
-        addRemoteVideo(r, call.peer);
-        document.getElementById('lobby-gate').classList.replace('flex', 'hidden');
-    });
-}
-
-function declineExpert() {
-    if (pendingCall) {
-        pendingCall.close();
-        document.getElementById('lobby-gate').classList.replace('flex', 'hidden');
-    }
-}
-
-function addRemoteVideo(stream, peerId) {
-    const grid = document.getElementById('video-grid');
-    if (document.getElementById(`container-${peerId}`)) return;
-    const container = document.createElement('div');
-    container.id = `container-${peerId}`;
-    container.className = "video-container";
-    const v = document.createElement('video');
-    v.srcObject = stream; v.autoplay = true; v.playsInline = true;
-    container.appendChild(v);
-    grid.appendChild(container);
-    if (grid.children.length > 1) grid.classList.add('side-by-side');
-}
-
-function startCall() {
-    const rId = document.getElementById('remote-id').value;
-    if(!rId || rId === peer.id) return;
-    const call = peer.call(rId, localStream);
-    activeCalls.set(rId, call);
-    call.on('stream', r => addRemoteVideo(r, rId));
-}
-
-memberRef.on('value', snap => {
-    const list = document.getElementById('member-list');
-    list.innerHTML = "";
-    snap.forEach(child => {
-        const m = child.val();
-        list.innerHTML += `<div class="p-2 bg-gray-800 rounded text-[9px] uppercase font-bold border border-gray-700">${m.name}</div>`;
-    });
-});
-
-chatRef.limitToLast(10).on('child_added', snap => {
-    const d = snap.val();
-    const msg = document.createElement('div');
-    msg.className = "p-2 bg-gray-800 rounded border border-gray-700 mb-2";
-    msg.innerHTML = `<p class="text-blue-400 font-bold text-[8px] mb-1">${d.sender.slice(-3)}</p><p>${d.text}</p>`;
-    document.getElementById('chat-box').appendChild(msg);
-});
-
-document.getElementById('chat-input').addEventListener('keypress', e => {
-    if (e.key === 'Enter' && e.target.value.trim() !== "") {
-        chatRef.push({ sender: peer.id, text: e.target.value });
-        e.target.value = "";
-    }
-});
 
 function onAIResults(r) {
     canvasElement.width = 1280; canvasElement.height = 720;
@@ -149,16 +125,30 @@ function onAIResults(r) {
 async function updateDeviceList() {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const vSelect = document.getElementById('video-source');
-    const aSelect = document.getElementById('audio-source');
-    vSelect.innerHTML = ""; aSelect.innerHTML = "";
     devices.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d.deviceId;
-        if(d.kind === 'videoinput') { opt.text = d.label || "Camera"; vSelect.add(opt); }
-        else if(d.kind === 'audioinput') { opt.text = d.label || "Mic"; aSelect.add(opt); }
+        if(d.kind === 'videoinput') {
+            const opt = document.createElement('option');
+            opt.value = d.deviceId; opt.text = d.label || "Camera"; vSelect.add(opt);
+        }
     });
 }
 
 function setBgMode(m) { bgMode = m; }
-function toggleMic() { if(localStream) localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled; }
-function toggleCam() { if(localStream) localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled; }
+function toggleMic() { localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled; }
+function toggleCam() { localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled; }
+
+// --- CHAT ---
+chatRef.limitToLast(10).on('child_added', snap => {
+    const d = snap.val();
+    const msg = document.createElement('div');
+    msg.className = "p-2 bg-gray-800 rounded border border-gray-700 mb-2";
+    msg.innerHTML = `<p class="text-blue-400 font-bold text-[8px] mb-1">${d.sender.slice(-3)}</p><p>${d.text}</p>`;
+    document.getElementById('chat-box').appendChild(msg);
+});
+
+document.getElementById('chat-input').addEventListener('keypress', e => {
+    if (e.key === 'Enter' && e.target.value.trim() !== "") {
+        chatRef.push({ sender: peer.id, text: e.target.value });
+        e.target.value = "";
+    }
+});
