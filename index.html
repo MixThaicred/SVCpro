@@ -3,63 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strive-Ops | Emergency Build</title>
+    <title>Strive-Ops</title>
+
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
     <style>
-        body { background: #020617; color: white; font-family: sans-serif; overflow: hidden; height: 100vh; }
-        .ops-glass { background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid #1e293b; }
-        
-        /* GRID SYSTEM */
-        #video-grid { 
-            display: grid; 
-            gap: 10px; 
-            padding: 10px; 
-            width: 100%; 
-            height: calc(100vh - 150px); 
-            grid-template-columns: 1fr; 
-        }
-        #video-grid.split { 
-            grid-template-columns: 1fr 1fr !important; 
-        }
-        
-        .video-container { background: #000; border-radius: 12px; overflow: hidden; position: relative; width: 100%; height: 100%; }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        body { background: #020617; color: white; }
+        video { width: 100%; border-radius: 10px; background: black; }
         #local-video { transform: scaleX(-1); }
-        
-        #lobby-gate { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; }
     </style>
 </head>
-<body class="flex flex-col">
 
-    <div id="lobby-gate">
-        <div class="bg-gray-900 p-8 rounded-2xl border border-blue-500 text-center">
-            <h2 class="text-xl font-bold mb-4">Incoming Expert...</h2>
-            <button onclick="acceptExpert()" class="bg-blue-600 px-8 py-3 rounded-xl font-bold">ADMIT</button>
-        </div>
+<body class="p-6">
+
+    <h1 class="text-xl mb-4">Strive-Ops Coaching</h1>
+
+    <div class="flex gap-4 mb-4">
+        <span id="my-id">Connecting...</span>
+        <input id="remote-id" placeholder="Remote ID" class="text-black px-2">
+        <button onclick="startCall()" class="bg-blue-600 px-4">Connect</button>
     </div>
 
-    <header class="p-4 ops-glass flex justify-between items-center">
-        <h1 class="font-black italic text-xl">STRIVE-OPS</h1>
-        <div class="flex gap-4 items-center">
-            <p id="my-id" class="text-xs font-mono text-blue-400">CONNECTING...</p>
-            <input type="text" id="remote-id" placeholder="PASTE ID HERE" class="bg-black border border-gray-700 px-2 py-1 text-xs rounded">
-            <button onclick="startCall()" class="bg-blue-600 px-4 py-1 rounded text-xs font-bold">CONNECT</button>
-        </div>
-    </header>
-
-    <main class="flex-grow">
-        <div id="video-grid">
-            <div class="video-container" id="container-local">
-                <video id="local-video" autoplay muted playsinline></video>
-            </div>
-        </div>
-    </main>
+    <div class="grid grid-cols-2 gap-4">
+        <video id="local-video" autoplay muted playsinline></video>
+        <video id="remote-video" autoplay playsinline></video>
+    </div>
 
     <script src="config.js"></script>
     <script src="app.js"></script>
+
 </body>
 </html>
