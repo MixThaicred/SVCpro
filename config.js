@@ -5,5 +5,5 @@ const STRIVE_CONFIG = {
         databaseURL: "https://strive-video-center-default-rtdb.firebaseio.com",
         projectId: "strive-video-center"
     },
-    geminiKey: "YOUR_GEMINI_API_KEY"
+    geminiKey: "AIzaSyA2bUrOy10bhZE2noBikVET09uoylIdxgA"
 };
