@@ -1,78 +1,99 @@
 /* ============================================================
-   STRIVE-OPS | STABILITY BUILD
+   STRIVE-OPS | FIXED 1-ON-1 VIDEO ENGINE
    ============================================================ */
 
-if (!firebase.apps.length) firebase.initializeApp(STRIVE_CONFIG.firebase);
-const memberRef = firebase.database().ref("strive-ops-members");
+if (!firebase.apps.length) {
+    firebase.initializeApp(STRIVE_CONFIG.firebase);
+}
 
-let peer, localStream, pendingCall = null;
-let activeCalls = new Map();
+let peer;
+let localStream;
+let currentCall = null;
 
 window.onload = async () => {
     await getMedia();
-    initNetworking();
+    initPeer();
+
+    // Auto-join support (?join=ID)
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get("join");
+    if (joinId) {
+        document.getElementById("remote-id").value = joinId;
+    }
 };
 
 async function getMedia() {
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        document.getElementById('local-video').srcObject = localStream;
-    } catch (e) {
-        console.error("Camera Fail:", e);
-        alert("Camera blocked. Please enable permissions.");
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+
+        const localVideo = document.getElementById("local-video");
+        localVideo.srcObject = localStream;
+        await localVideo.play();
+
+    } catch (err) {
+        console.error(err);
+        alert("Camera access required");
     }
 }
 
-function initNetworking() {
-    const id = "so-" + Math.random().toString(36).substr(2, 5);
-    peer = new Peer(id, { host: '0.peerjs.com', port: 443, secure: true });
-    
-    peer.on('open', nid => {
-        document.getElementById('my-id').innerText = "NODE: " + nid;
+function initPeer() {
+    const id = "so-" + Math.random().toString(36).slice(2, 7);
+
+    peer = new Peer(id, {
+        host: "0.peerjs.com",
+        port: 443,
+        secure: true
     });
 
-    peer.on('call', call => {
-        pendingCall = call;
-        document.getElementById('lobby-gate').style.display = 'flex';
+    peer.on("open", (id) => {
+        document.getElementById("my-id").innerText = id;
+    });
+
+    // INCOMING CALL
+    peer.on("call", (call) => {
+        if (currentCall) currentCall.close();
+
+        currentCall = call;
+
+        call.answer(localStream);
+
+        call.on("stream", (remoteStream) => {
+            setRemoteStream(remoteStream);
+        });
+
+        call.on("close", clearRemote);
     });
 }
 
-function acceptExpert() {
-    if (!pendingCall) return;
-    pendingCall.answer(localStream);
-    
-    pendingCall.on('stream', remoteStream => {
-        addRemoteVideo(remoteStream, pendingCall.peer);
-        document.getElementById('lobby-gate').style.display = 'none';
-    });
-}
-
+// OUTGOING CALL
 function startCall() {
-    const rId = document.getElementById('remote-id').value;
-    if(!rId) return;
-    
-    const call = peer.call(rId, localStream);
-    call.on('stream', remoteStream => {
-        addRemoteVideo(remoteStream, rId);
+    const id = document.getElementById("remote-id").value.trim();
+    if (!id) return;
+
+    if (currentCall) currentCall.close();
+
+    const call = peer.call(id, localStream);
+    currentCall = call;
+
+    call.on("stream", (remoteStream) => {
+        setRemoteStream(remoteStream);
     });
+
+    call.on("close", clearRemote);
 }
 
-function addRemoteVideo(stream, peerId) {
-    const grid = document.getElementById('video-grid');
-    if (document.getElementById(`container-${peerId}`)) return;
+// SET REMOTE VIDEO
+function setRemoteStream(stream) {
+    const remoteVideo = document.getElementById("remote-video");
+    remoteVideo.srcObject = stream;
+    remoteVideo.play().catch(() => {});
+}
 
-    const container = document.createElement('div');
-    container.id = `container-${peerId}`;
-    container.className = "video-container";
-    
-    const v = document.createElement('video');
-    v.srcObject = stream;
-    v.autoplay = true;
-    v.playsInline = true;
-    
-    container.appendChild(v);
-    grid.appendChild(container);
-    
-    // FORCE SIDE-BY-SIDE
-    grid.classList.add('split');
+// CLEAR REMOTE
+function clearRemote() {
+    const remoteVideo = document.getElementById("remote-video");
+    remoteVideo.srcObject = null;
 }
