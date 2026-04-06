@@ -4,5 +4,6 @@ const STRIVE_CONFIG = {
         authDomain: "strive-video-center.firebaseapp.com",
         databaseURL: "https://strive-video-center-default-rtdb.firebaseio.com",
         projectId: "strive-video-center"
-    }
+    },
+    geminiKey: "YOUR_GEMINI_API_KEY"
 };
