@@ -3,7 +3,7 @@
    Founder: Luis Morales Otero
    ============================================================ */
 
-const GEMINI_API_KEY = "YOUR_GEMINI_KEY"; // Paste your key here
+const GEMINI_API_KEY = "AIzaSyA2bUrOy10bhZE2noBikVET09uoylIdxgA"; // Paste your key here
 const firebaseConfig = {
     apiKey: "AIzaSyA0gT_lJAxNDdlYHg7uiU6XUdqSPRgShvs",
     authDomain: "strive-video-center.firebaseapp.com",
