@@ -154,6 +154,47 @@
       margin-top: 10px;
     }
 
+    #incoming-call {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+
+    .modal {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      max-width: 360px;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .modal-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 18px;
+      word-break: break-all;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
     @media (max-width: 800px) {
       .videos {
         grid-template-columns: 1fr;
@@ -178,13 +219,13 @@
         <button id="start-camera-btn" class="btn-green">Start Camera</button>
         <button id="copy-id-btn" class="btn-gray">Copy My ID</button>
         <input id="remote-id-input" placeholder="Paste remote ID here" />
-        <button id="call-btn" class="btn-blue">Call</button>
+        <button id="connect-btn" class="btn-blue">Connect</button>
         <button id="hangup-btn" class="btn-red">Hang Up</button>
       </div>
     </div>
 
     <div class="card status" id="status">
-      Ready. Start camera on one browser, then call it from the other browser.
+      Ready. Start camera on one browser, then connect to it from the other browser.
     </div>
 
     <div class="videos">
@@ -203,6 +244,17 @@
     </div>
   </div>
 
-  <script src="app.js?v=1"></script>
+  <div id="incoming-call">
+    <div class="modal">
+      <div class="modal-title">Incoming Session Request</div>
+      <div id="caller-id" class="modal-subtitle">unknown</div>
+      <div class="modal-actions">
+        <button id="accept-call-btn" class="btn-green">Accept</button>
+        <button id="decline-call-btn" class="btn-red">Decline</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2"></script>
 </body>
 </html>
