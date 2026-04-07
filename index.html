@@ -6,7 +6,9 @@
   <title>Strive-Ops | Phase 1 Transmission Test</title>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -66,8 +68,9 @@
       align-items: center;
     }
 
-    input {
-      flex: 1 1 260px;
+    input,
+    select {
+      flex: 1 1 220px;
       min-width: 220px;
       padding: 12px 14px;
       border-radius: 10px;
@@ -206,7 +209,7 @@
   <div class="app">
     <div class="header">
       <div class="title">Strive-Ops</div>
-      <div class="subtitle">Phase 1 — Minimal browser-to-browser transmission test for the Strive-Ops Ecosystem</div>
+      <div class="subtitle">Phase 1 — Transmission test for the Strive-Ops Ecosystem</div>
     </div>
 
     <div class="card">
@@ -221,6 +224,25 @@
         <input id="remote-id-input" placeholder="Paste remote ID here" />
         <button id="connect-btn" class="btn-blue">Connect</button>
         <button id="hangup-btn" class="btn-red">Hang Up</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="controls">
+        <select id="camera-select">
+          <option value="">Select Camera</option>
+        </select>
+        <select id="mic-select">
+          <option value="">Select Microphone</option>
+        </select>
+        <button id="apply-devices-btn" class="btn-blue">Apply Devices</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="controls">
+        <button id="mute-mic-btn" class="btn-gray">Mute Mic</button>
+        <button id="mute-remote-btn" class="btn-gray">Mute Remote Audio</button>
       </div>
     </div>
 
@@ -255,6 +277,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
