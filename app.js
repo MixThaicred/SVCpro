@@ -1,6 +1,7 @@
 let peer = null;
 let localStream = null;
 let currentCall = null;
+let pendingIncomingCall = null;
 let pendingRemoteStream = null;
 
 const myIdEl = document.getElementById("my-id");
@@ -15,9 +16,14 @@ const remotePlaceholder = document.getElementById("remote-placeholder");
 
 const startCameraBtn = document.getElementById("start-camera-btn");
 const copyIdBtn = document.getElementById("copy-id-btn");
-const callBtn = document.getElementById("call-btn");
+const connectBtn = document.getElementById("connect-btn");
 const hangupBtn = document.getElementById("hangup-btn");
 const tapPlayBtn = document.getElementById("tap-play-btn");
+
+const incomingCallModal = document.getElementById("incoming-call");
+const callerIdEl = document.getElementById("caller-id");
+const acceptCallBtn = document.getElementById("accept-call-btn");
+const declineCallBtn = document.getElementById("decline-call-btn");
 
 window.addEventListener("load", () => {
   createPeer();
@@ -28,9 +34,12 @@ window.addEventListener("load", () => {
 function bindEvents() {
   startCameraBtn.addEventListener("click", startCamera);
   copyIdBtn.addEventListener("click", copyMyId);
-  callBtn.addEventListener("click", startCall);
+  connectBtn.addEventListener("click", startConnectionRequest);
   hangupBtn.addEventListener("click", hangUp);
   tapPlayBtn.addEventListener("click", forcePlayRemote);
+
+  acceptCallBtn.addEventListener("click", acceptIncomingCall);
+  declineCallBtn.addEventListener("click", declineIncomingCall);
 }
 
 function setStatus(message) {
@@ -51,6 +60,10 @@ function showTapPlay(show) {
   tapPlayBtn.style.display = show ? "block" : "none";
 }
 
+function showIncomingModal(show) {
+  incomingCallModal.style.display = show ? "flex" : "none";
+}
+
 function createPeer() {
   const id = "so-" + Math.random().toString(36).slice(2, 8);
 
@@ -66,26 +79,13 @@ function createPeer() {
   });
 
   peer.on("call", (incomingCall) => {
-    console.log("Incoming call from:", incomingCall.peer);
+    console.log("Incoming connection request from:", incomingCall.peer);
 
-    if (currentCall) {
-      currentCall.close();
-      currentCall = null;
-    }
+    pendingIncomingCall = incomingCall;
+    callerIdEl.textContent = incomingCall.peer;
+    showIncomingModal(true);
 
-    currentCall = incomingCall;
-
-    // If this browser started camera, answer with video/audio.
-    // If not, answer receive-only.
-    if (localStream) {
-      incomingCall.answer(localStream);
-      setStatus("Incoming call answered with local camera.");
-    } else {
-      incomingCall.answer();
-      setStatus("Incoming call answered without local camera.");
-    }
-
-    attachCallEvents(incomingCall);
+    setStatus("Incoming connection request awaiting approval.");
   });
 
   peer.on("error", (err) => {
@@ -113,7 +113,7 @@ async function startCamera() {
     await localVideo.play();
 
     showLocalVideo(true);
-    setStatus("Camera started. This browser can now transmit video.");
+    setStatus("Camera started. This browser can now transmit video if a session is accepted.");
   } catch (err) {
     console.error("Camera error:", err);
     setStatus("Could not start camera.");
@@ -121,7 +121,7 @@ async function startCamera() {
   }
 }
 
-function startCall() {
+function startConnectionRequest() {
   const remoteId = remoteIdInput.value.trim();
 
   if (!remoteId) {
@@ -139,9 +139,8 @@ function startCall() {
     currentCall = null;
   }
 
-  setStatus("Calling remote browser...");
+  setStatus("Sending connection request...");
 
-  // If camera is active, send it. Otherwise call receive-only.
   if (localStream) {
     currentCall = peer.call(remoteId, localStream);
   } else {
@@ -149,6 +148,40 @@ function startCall() {
   }
 
   attachCallEvents(currentCall);
+}
+
+function acceptIncomingCall() {
+  if (!pendingIncomingCall) return;
+
+  if (currentCall) {
+    currentCall.close();
+    currentCall = null;
+  }
+
+  currentCall = pendingIncomingCall;
+  pendingIncomingCall = null;
+
+  showIncomingModal(false);
+
+  if (localStream) {
+    currentCall.answer(localStream);
+    setStatus("Connection accepted. Sending local camera.");
+  } else {
+    currentCall.answer();
+    setStatus("Connection accepted without local camera.");
+  }
+
+  attachCallEvents(currentCall);
+}
+
+function declineIncomingCall() {
+  if (pendingIncomingCall) {
+    pendingIncomingCall.close();
+    pendingIncomingCall = null;
+  }
+
+  showIncomingModal(false);
+  setStatus("Connection request declined.");
 }
 
 function attachCallEvents(call) {
@@ -161,7 +194,9 @@ function attachCallEvents(call) {
   call.on("close", () => {
     console.log("Call closed");
     clearRemote();
-    setStatus("Call ended.");
+    showIncomingModal(false);
+    pendingIncomingCall = null;
+    setStatus("Connection ended.");
   });
 
   call.on("error", (err) => {
@@ -218,11 +253,17 @@ function clearRemote() {
 }
 
 function hangUp() {
+  if (pendingIncomingCall) {
+    pendingIncomingCall.close();
+    pendingIncomingCall = null;
+  }
+
   if (currentCall) {
     currentCall.close();
     currentCall = null;
   }
 
+  showIncomingModal(false);
   clearRemote();
   setStatus("Ready.");
 }
