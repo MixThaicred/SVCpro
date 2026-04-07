@@ -9,16 +9,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --bg0:#04060f;--bg1:#080c1a;--bg2:#0c1122;--bg3:#111829;--bg4:#182035;
-  --bd:rgba(255,255,255,.07);--bdh:rgba(255,255,255,.14);
+  --bd:rgba(255,255,255,.07);--bdh:rgba(255,255,255,.15);
   --t1:#dde6ff;--t2:#8494b8;--t3:#3d4e72;
-  --ac:#2dd4bf;--adim:rgba(45,212,191,.11);--aglow:rgba(45,212,191,.22);
-  --red:#f87171;--rdim:rgba(248,113,113,.13);
-  --amb:#fbbf24;--amdim:rgba(251,191,36,.12);
-  --grn:#4ade80;--gdim:rgba(74,222,128,.12);
-  --pw:320px;--tbh:68px;--tph:50px;--thumbH:130px;
+  --ac:#2dd4bf;--adim:rgba(45,212,191,.10);--aglow:rgba(45,212,191,.20);
+  --red:#f87171;--rdim:rgba(248,113,113,.12);
+  --amb:#fbbf24;--amdim:rgba(251,191,36,.11);
+  --grn:#4ade80;--gdim:rgba(74,222,128,.11);
+  --pur:#a78bfa;--pudim:rgba(167,139,250,.11);
+  --TH:128px; /* thumbnail height in presentation mode */
   --fu:'Barlow',sans-serif;--fb:'Barlow Condensed',sans-serif;--fm:'JetBrains Mono',monospace;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -26,225 +28,193 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:4px}
 .app{display:flex;flex-direction:column;height:100vh}
 
-/* ── TOPBAR ──────────────────────────────── */
-.topbar{
-  height:var(--tph);min-height:var(--tph);background:var(--bg1);
-  border-bottom:1px solid var(--bd);display:flex;align-items:center;
-  gap:12px;padding:0 18px;flex-shrink:0;
-}
-.tb-brand{font-family:var(--fb);font-size:20px;font-weight:700;letter-spacing:.03em;white-space:nowrap}
+/* ── TOPBAR ────────────────────────────────────────────────────── */
+.topbar{height:50px;min-height:50px;background:var(--bg1);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:12px;padding:0 18px;flex-shrink:0}
+.tb-brand{font-family:var(--fb);font-size:20px;font-weight:700;letter-spacing:.03em}
 .tb-brand em{color:var(--ac);font-style:normal}
 .tb-sep{width:1px;height:22px;background:var(--bd);flex-shrink:0}
-.tb-sname{font-size:13px;font-weight:600;color:var(--t2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-sname{font-size:13px;font-weight:600;color:var(--t2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb-pin{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
-  padding:3px 9px;border-radius:20px;background:var(--adim);
-  border:1px solid rgba(45,212,191,.2);color:var(--ac)}
+  padding:3px 9px;border-radius:20px;background:var(--adim);border:1px solid rgba(45,212,191,.2);color:var(--ac)}
 .tb-timer{font-family:var(--fm);font-size:12px;color:var(--t2);min-width:48px}
 .tb-sp{flex:1}
-.tb-status{font-family:var(--fm);font-size:11px;color:var(--t3);
-  max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-status{font-family:var(--fm);font-size:11px;color:var(--t3);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb-dot{width:8px;height:8px;border-radius:50%;background:var(--t3);flex-shrink:0;transition:all .3s}
 .tb-dot.on{background:var(--ac);box-shadow:0 0 8px var(--ac)}
 .tb-dot.ring{background:var(--amb);box-shadow:0 0 8px var(--amb);animation:bl .8s infinite}
 .tb-dot.live{background:var(--red);box-shadow:0 0 8px var(--red)}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}
 
-/* ── MIDDLE ──────────────────────────────── */
+/* ── MIDDLE ────────────────────────────────────────────────────── */
 .middle{flex:1;display:flex;min-height:0;overflow:hidden}
 
-/* ── VIDEO STAGE ─────────────────────────── */
+/* ── VIDEO STAGE ───────────────────────────────────────────────── */
 .vstage{
-  flex:1;min-width:0;display:flex;flex-direction:column;
-  padding:12px;gap:10px;background:var(--bg0);position:relative;
+  flex:1;min-width:0;
+  display:flex;flex-direction:column;
+  padding:12px;gap:10px;
+  background:var(--bg0);
 }
 
-/* DEFAULT: camera strip fills entire stage as a normal side-by-side grid */
-.thumb-strip{
+/* CAM ROW — fills entire stage by default */
+.cam-row{
   flex:1;min-height:0;
-  display:flex;gap:12px;
-  justify-content:center;
+  display:flex;flex-direction:row;gap:12px;
+  transition:flex .25s ease;
 }
 
-/* DEFAULT: each camera tile expands to fill available space */
-.vthumb{
-  flex:1;min-width:0;max-width:50%;
-  height:100%;
-  background:#000;border-radius:12px;
-  overflow:hidden;position:relative;
+/* In presentation mode: cam-row collapses to fixed strip */
+.vstage.presenting .cam-row{
+  flex:0 0 var(--TH);
+  min-height:var(--TH);
+  max-height:var(--TH);
+}
+
+/* CAMERA TILES */
+.vtile{
+  /* normal: fills the row (equal width, full height) */
+  flex:1;min-width:0;
+  position:relative;
+  background:#000;border-radius:12px;overflow:hidden;
   border:2px solid var(--bd);
   transition:all .25s ease;
 }
-.vthumb:hover{border-color:var(--bdh)}
-.vthumb.speaking{border-color:var(--ac);box-shadow:0 0 10px rgba(45,212,191,.3)}
 
-/* ── PRESENTATION MODE — only active while screen sharing ── */
-.vstage.presenting .thumb-strip{
-  flex:0 0 var(--thumbH);
-  height:var(--thumbH);
-  min-height:var(--thumbH);
-  justify-content:center;
-}
-.vstage.presenting .vthumb{
-  flex:0 0 auto;
-  width:calc(var(--thumbH) * 16 / 9);
-  max-width:none;
-  height:var(--thumbH);
+/* In presentation mode: tiles become fixed-size thumbnails */
+.vstage.presenting .vtile{
+  flex:0 0 calc(var(--TH) * 16/9);
   border-radius:10px;
 }
 
-.vthumb .th{
-  position:absolute;bottom:0;left:0;right:0;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:5px 8px;z-index:2;
-  background:linear-gradient(to top,rgba(0,0,0,.75) 0%,transparent 100%);
+/* All media inside tiles fills absolutely — this is the fix */
+.vtile video,.vtile canvas{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;display:block;
 }
-.vthumb .tname{font-size:11px;font-weight:600;color:#fff;
-  text-shadow:0 1px 3px rgba(0,0,0,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
-.vthumb .tbadge{font-size:8px;font-weight:700;font-family:var(--fm);
+#local-canvas{transform:scaleX(-1);display:none}
+#remote-video{display:none}
+
+/* Tile header overlay */
+.tile-hd{
+  position:absolute;bottom:0;left:0;right:0;z-index:4;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:24px 10px 8px;
+  background:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 100%);
+}
+.tile-name{font-size:12px;font-weight:600;color:#fff;
+  text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.vstage.presenting .tile-name{font-size:10px}
+.tbadge{font-size:8px;font-weight:700;font-family:var(--fm);
   padding:1px 5px;border-radius:20px;letter-spacing:.06em;flex-shrink:0}
 .b-off{background:rgba(0,0,0,.5);color:var(--t3);border:1px solid rgba(255,255,255,.08)}
 .b-live{background:rgba(248,113,113,.25);color:var(--red);border:1px solid rgba(248,113,113,.4);animation:bl 2s infinite}
 .b-conn{background:rgba(45,212,191,.2);color:var(--ac);border:1px solid rgba(45,212,191,.3)}
-.b-wait{background:rgba(251,191,36,.2);color:var(--amb);border:1px solid rgba(251,191,36,.3)}
 
-.vthumb video,.vthumb canvas{width:100%;height:100%;object-fit:cover;display:block}
-#local-canvas{transform:scaleX(-1);display:none}
-#remote-video{display:none}
-
-.vthumb .tempty{
-  position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:5px;background:var(--bg3)}
-.vthumb .tempty svg{opacity:.4}
-.vthumb .tet{font-size:9px;color:var(--t3);text-align:center}
-
-.muted-ico{
-  position:absolute;top:6px;right:6px;z-index:3;
-  width:20px;height:20px;border-radius:50%;
+/* Muted mic indicator */
+.mic-off-ico{position:absolute;top:8px;right:8px;z-index:5;
+  width:22px;height:22px;border-radius:50%;
   background:rgba(248,113,113,.9);display:none;align-items:center;justify-content:center}
-.muted-ico.show{display:flex}
+.mic-off-ico.show{display:flex}
 
-/* MAIN CONTENT AREA — hidden until screen sharing starts */
-.main-area{
+/* Empty state inside tile */
+.tempty{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;background:var(--bg2);z-index:2}
+.te-ico{width:44px;height:44px;border-radius:12px;background:var(--bg3);border:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:center}
+.te-txt{font-size:11px;color:var(--t3);text-align:center;line-height:1.6;max-width:160px}
+.vstage.presenting .tempty .te-ico{width:28px;height:28px;border-radius:8px}
+.vstage.presenting .tempty .te-txt{display:none}
+
+/* SCREEN SHARE AREA — hidden until sharing starts */
+.share-area{
   display:none;
-  min-height:0;position:relative;border-radius:12px;
-  overflow:hidden;background:#000;border:1px solid var(--bd);
+  flex:1;min-height:0;
+  position:relative;border-radius:12px;overflow:hidden;
+  background:#000;border:1px solid var(--bd);
 }
-.vstage.presenting .main-area{
-  display:block;
-  flex:1;
-}
-
-/* Default state (no screen share): big message */
-.no-share-msg{
-  position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:12px;
-}
-.no-share-icon{font-size:40px;opacity:.3}
-.no-share-text{font-size:13px;color:var(--t3);text-align:center;line-height:1.7}
-
-/* Screen share fills main area */
-#screen-video{
-  width:100%;height:100%;object-fit:contain;
-  background:#000;display:none;
-}
-
-.share-label{
+.vstage.presenting .share-area{display:flex;align-items:center;justify-content:center}
+#screen-video{width:100%;height:100%;object-fit:contain;background:#000}
+.share-banner{
   position:absolute;top:10px;left:50%;transform:translateX(-50%);
-  display:none;align-items:center;gap:7px;
-  padding:4px 12px;border-radius:20px;
+  display:flex;align-items:center;gap:7px;padding:4px 14px;border-radius:20px;
   background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);
-  font-size:11px;font-weight:700;color:var(--amb);
-  font-family:var(--fm);letter-spacing:.06em;z-index:5;
+  font-size:11px;font-weight:700;color:var(--amb);font-family:var(--fm);z-index:5;
 }
-.share-label.show{display:flex}
 .share-dot{width:6px;height:6px;border-radius:50%;background:var(--amb);animation:bl 1s infinite}
 
-#tap-play{
-  display:none;position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+/* tap to play */
+#tap-play{display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
   padding:8px 20px;border-radius:20px;border:1px solid rgba(45,212,191,.3);
-  background:var(--adim);color:var(--ac);font-family:var(--fu);
-  font-size:12px;font-weight:700;cursor:pointer;z-index:5;white-space:nowrap;
-}
+  background:var(--adim);color:var(--ac);font-family:var(--fu);font-size:12px;font-weight:700;
+  cursor:pointer;z-index:6;white-space:nowrap}
 
-/* ── SIDE PANEL ──────────────────────────── */
-.spanel{
-  width:var(--pw);min-width:var(--pw);background:var(--bg1);
-  border-left:1px solid var(--bd);display:flex;flex-direction:column;
-  transform:translateX(100%);transition:transform .22s ease;overflow:hidden;
-}
+/* ── SIDE PANEL ────────────────────────────────────────────────── */
+.spanel{width:300px;min-width:300px;background:var(--bg1);border-left:1px solid var(--bd);
+  display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;overflow:hidden}
 .spanel.open{transform:translateX(0)}
-.ph{display:flex;align-items:center;justify-content:space-between;
-  padding:14px 16px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid var(--bd);flex-shrink:0}
 .ph-title{font-size:13px;font-weight:700}
-.ph-x{width:28px;height:28px;border-radius:7px;border:1px solid var(--bd);
-  background:var(--bg3);color:var(--t2);cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-size:16px;
-  transition:background .13s}
+.ph-x{width:28px;height:28px;border-radius:7px;border:1px solid var(--bd);background:var(--bg3);color:var(--t2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:background .13s}
 .ph-x:hover{background:var(--bg4)}
 
 /* Chat */
-#chat-panel{display:flex;flex-direction:column;flex:1;min-height:0}
-.cmsg-wrap{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
-.cmsg{display:flex;flex-direction:column;gap:3px}
+#chat-pnl{display:flex;flex-direction:column;flex:1;min-height:0}
+.cmsg-wrap{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px}
+.cmsg{display:flex;flex-direction:column;gap:2px}
 .cmsg.me{align-items:flex-end}.cmsg.them{align-items:flex-start}
-.cbubble{max-width:82%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word}
+.cbubble{max-width:84%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word}
 .cmsg.me .cbubble{background:var(--adim);border:1px solid rgba(45,212,191,.2);border-bottom-right-radius:3px}
 .cmsg.them .cbubble{background:var(--bg3);border:1px solid var(--bd);border-bottom-left-radius:3px}
 .cmeta{font-size:10px;color:var(--t3);font-family:var(--fm)}
-.cinput-row{display:flex;gap:8px;padding:12px;border-top:1px solid var(--bd);flex-shrink:0}
-.cinput{flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--bd);
-  background:var(--bg0);color:var(--t1);font-family:var(--fu);font-size:13px;outline:none;transition:border-color .13s}
+.cinrow{display:flex;gap:8px;padding:11px;border-top:1px solid var(--bd);flex-shrink:0}
+.cinput{flex:1;padding:9px 11px;border-radius:10px;border:1px solid var(--bd);background:var(--bg0);
+  color:var(--t1);font-family:var(--fu);font-size:13px;outline:none;transition:border-color .13s}
 .cinput::placeholder{color:var(--t3)}.cinput:focus{border-color:var(--ac)}
-.csend{width:38px;height:38px;border-radius:10px;border:0;background:var(--ac);color:#022c22;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:opacity .13s}
+.csend{width:36px;height:36px;border-radius:9px;border:0;background:var(--ac);color:#022c22;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;transition:opacity .13s}
 .csend:hover{opacity:.85}
-.cempty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:8px;color:var(--t3);font-size:12px;text-align:center}
+.cempty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--t3);font-size:12px;text-align:center}
 
 /* Members */
-#members-panel{flex-direction:column;flex:1;min-height:0;display:none}
-.mlist{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
-
-/* Lobby section in members */
-.lobby-section{padding:10px 12px;border-bottom:1px solid var(--bd);flex-shrink:0}
-.lobby-label{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t3);margin-bottom:8px}
-.lobby-card{
-  display:flex;align-items:center;gap:10px;padding:10px 12px;
-  border-radius:10px;background:var(--amdim);border:1px solid rgba(251,191,36,.2);
-  margin-bottom:6px;
-}
-.lobby-avatar{width:32px;height:32px;border-radius:50%;background:var(--bg4);
-  display:flex;align-items:center;justify-content:center;font-family:var(--fb);
-  font-size:12px;font-weight:700;color:var(--amb);flex-shrink:0}
-.lobby-info{flex:1;min-width:0}
-.lobby-name{font-size:12px;font-weight:600;color:var(--amb)}
-.lobby-sub{font-size:10px;color:var(--t3);font-family:var(--fm)}
-.lobby-actions{display:flex;gap:6px}
-.lobby-btn{padding:5px 10px;border-radius:7px;border:0;cursor:pointer;
-  font-family:var(--fu);font-size:11px;font-weight:700;transition:opacity .13s}
-.lobby-btn:hover{opacity:.85}
-.lobby-btn.admit{background:var(--grn);color:#052e16}
-.lobby-btn.deny{background:var(--rdim);color:var(--red);border:1px solid rgba(248,113,113,.2)}
-
-.mcard{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg2);border:1px solid var(--bd)}
-.mavatar{width:36px;height:36px;border-radius:50%;background:var(--bg4);border:1px solid var(--bd);
-  display:flex;align-items:center;justify-content:center;font-family:var(--fb);
-  font-size:14px;font-weight:700;color:var(--ac);flex-shrink:0}
+#members-pnl{flex-direction:column;flex:1;min-height:0;display:none}
+.mlist{flex:1;overflow-y:auto;padding:11px;display:flex;flex-direction:column;gap:7px}
+.mcard{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:10px;background:var(--bg2);border:1px solid var(--bd)}
+.mavatar{width:34px;height:34px;border-radius:50%;background:var(--bg4);border:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:center;font-family:var(--fb);font-size:13px;font-weight:700;color:var(--ac);flex-shrink:0}
 .minfo{flex:1;min-width:0}
-.mname{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mid{font-family:var(--fm);font-size:9px;color:var(--t3)}
+.mname{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mid{font-family:var(--fm);font-size:9px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .micons{display:flex;gap:5px;flex-shrink:0}
-.mi{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--bg4)}
+.mi{width:21px;height:21px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--bg4)}
 .mi.off{background:var(--rdim)}
 
-/* ── TOOLBAR ─────────────────────────────── */
-.toolbar{
-  height:var(--tbh);min-height:var(--tbh);background:var(--bg1);
-  border-top:1px solid var(--bd);display:flex;align-items:center;
-  justify-content:center;gap:4px;padding:0 16px;flex-shrink:0;
-}
-.tsep{width:1px;height:36px;background:var(--bd);margin:0 6px;flex-shrink:0}
-.ctl{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:0 3px;min-width:56px}
+/* AI Panel */
+#ai-pnl{flex-direction:column;flex:1;min-height:0;display:none}
+.ai-toolbar{display:flex;gap:7px;padding:11px;border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap}
+.ai-btn{padding:7px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--bg3);
+  color:var(--t1);cursor:pointer;font-family:var(--fu);font-size:12px;font-weight:600;transition:all .13s}
+.ai-btn:hover{background:var(--bg4);border-color:var(--bdh)}
+.ai-btn.rec{background:var(--rdim);border-color:rgba(248,113,113,.25);color:var(--red)}
+.ai-btn.rec:hover{background:rgba(248,113,113,.2)}
+.ai-btn.ac{background:var(--adim);border-color:rgba(45,212,191,.25);color:var(--ac)}
+.ai-btn.ac:hover{background:var(--aglow)}
+.ai-btn.pu{background:var(--pudim);border-color:rgba(167,139,250,.25);color:var(--pur)}
+.transcript-wrap{flex:1;overflow-y:auto;padding:11px;display:flex;flex-direction:column;gap:6px}
+.tx-line{display:flex;gap:8px;align-items:flex-start}
+.tx-spk{font-size:10px;font-weight:700;color:var(--ac);min-width:36px;font-family:var(--fm);margin-top:2px;flex-shrink:0}
+.tx-text{font-size:12px;line-height:1.6;color:var(--t1)}
+.tx-time{font-size:9px;color:var(--t3);font-family:var(--fm);margin-top:3px;flex-shrink:0}
+.tx-interim{color:var(--t3);font-style:italic}
+.ai-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--t3);font-size:12px;text-align:center}
+
+/* ── TOOLBAR ───────────────────────────────────────────────────── */
+.toolbar{height:68px;min-height:68px;background:var(--bg1);border-top:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:center;gap:4px;padding:0 14px;flex-shrink:0}
+.tsep{width:1px;height:36px;background:var(--bd);margin:0 5px;flex-shrink:0}
+.ctl{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:0 3px;min-width:54px}
 .cbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--bd);background:var(--bg3);
   color:var(--t1);cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .13s;position:relative;flex-shrink:0}
@@ -252,8 +222,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 .cbtn.muted{background:var(--rdim);border-color:rgba(248,113,113,.3);color:var(--red)}
 .cbtn.active{background:var(--adim);border-color:rgba(45,212,191,.3);color:var(--ac)}
 .cbtn.sharing{background:var(--amdim);border-color:rgba(251,191,36,.3);color:var(--amb)}
+.cbtn.recording{background:var(--rdim);border-color:rgba(248,113,113,.3);color:var(--red);animation:bl 1.5s infinite}
 .cbtn.end-btn{background:var(--rdim);border-color:rgba(248,113,113,.3);color:var(--red);
-  min-width:72px;border-radius:22px;width:auto;padding:0 14px;gap:6px;font-size:13px;font-weight:700}
+  min-width:68px;border-radius:22px;width:auto;padding:0 14px;gap:5px;font-size:13px;font-weight:700}
 .cbtn.end-btn:hover{background:rgba(248,113,113,.22)}
 .clbl{font-size:10px;font-weight:600;color:var(--t3);white-space:nowrap}
 .cbadge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;
@@ -261,20 +232,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
   color:#fff;display:none;align-items:center;justify-content:center}
 .cbadge.on{display:flex}
 
-/* ── OVERLAYS & MODALS ───────────────────── */
+/* ── OVERLAYS ──────────────────────────────────────────────────── */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);
   align-items:center;justify-content:center;z-index:9000;padding:20px}
 .overlay.show{display:flex}
 .modal{background:var(--bg2);border:1px solid var(--bdh);border-radius:18px;width:100%;animation:fup .2s ease}
-@keyframes fup{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.mhd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bd)}
+@keyframes fup{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--bd)}
 .mtitle{font-family:var(--fb);font-size:18px;font-weight:700;letter-spacing:.03em}
-.mx{width:30px;height:30px;border-radius:8px;border:1px solid var(--bd);background:var(--bg3);
-  color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:background .13s}
+.mx{width:30px;height:30px;border-radius:8px;border:1px solid var(--bd);background:var(--bg3);color:var(--t2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:background .13s}
 .mx:hover{background:var(--bg4)}
-.mbody{padding:16px 20px;display:flex;flex-direction:column;gap:14px;max-height:80vh;overflow-y:auto}
+.mbody{padding:16px 20px;display:flex;flex-direction:column;gap:13px;max-height:82vh;overflow-y:auto}
 .msec{display:flex;flex-direction:column;gap:8px}
-.msec-ttl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t3)}
+.msttl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t3)}
 .mrow{display:flex;flex-direction:column;gap:4px}
 .mlbl{font-size:11px;font-weight:600;color:var(--t2)}
 .msel,.minp{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--bd);
@@ -283,79 +254,77 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%233d4e72' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;cursor:pointer}
 .msel:focus,.minp:focus{border-color:var(--ac)}
-.minp{background-image:none;padding-right:11px;font-family:var(--fu);letter-spacing:0}
-.minp.mono{font-family:var(--fm);letter-spacing:.1em}
-.mbtn{padding:9px 14px;border-radius:9px;border:1px solid var(--bd);background:var(--bg3);
-  color:var(--t1);cursor:pointer;font-family:var(--fu);font-size:13px;font-weight:600;
-  transition:all .13s;text-align:center;width:100%}
+.minp{background-image:none;padding-right:11px}
+.mbtn{padding:9px 14px;border-radius:9px;border:1px solid var(--bd);background:var(--bg3);color:var(--t1);
+  cursor:pointer;font-family:var(--fu);font-size:13px;font-weight:600;transition:all .13s;text-align:center;width:100%}
 .mbtn:hover{background:var(--bg4);border-color:var(--bdh)}
 .mbtn.ac{background:var(--adim);border-color:rgba(45,212,191,.25);color:var(--ac)}
 .mbtn.ac:hover{background:var(--aglow)}
 .mr2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mfx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.mchip{padding:9px 4px 7px;border-radius:9px;border:1px solid var(--bd);background:var(--bg3);
+.mchip{padding:8px 4px 6px;border-radius:9px;border:1px solid var(--bd);background:var(--bg3);
   cursor:pointer;text-align:center;transition:all .13s;display:flex;flex-direction:column;align-items:center;gap:4px}
 .mchip:hover{background:var(--bg4)}.mchip.on{background:var(--adim);border-color:rgba(45,212,191,.3)}
-.mchip .ci{font-size:17px}.mchip .cn{font-size:9px;font-weight:700;color:var(--t2)}
+.mchip .ci{font-size:16px}.mchip .cn{font-size:9px;font-weight:700;color:var(--t2)}
 .mchip.on .cn{color:var(--ac)}
 .pin-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
   background:var(--bg3);border:1px solid var(--bd);font-size:12px;color:var(--t2)}
 .pdot{width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0;transition:all .3s}
 .pdot.on{background:var(--ac);box-shadow:0 0 6px var(--ac)}
-
 /* Share modal */
 .sbox{display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--bg0);border:1px solid var(--bd)}
 .stext{flex:1;font-family:var(--fm);font-size:11px;color:var(--ac);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cpbtn{padding:5px 12px;border-radius:7px;border:0;background:var(--adim);color:var(--ac);cursor:pointer;font-family:var(--fu);font-size:12px;font-weight:700;white-space:nowrap;transition:background .13s}
+.cpbtn{padding:5px 11px;border-radius:7px;border:0;background:var(--adim);color:var(--ac);cursor:pointer;
+  font-family:var(--fu);font-size:12px;font-weight:700;white-space:nowrap;transition:background .13s}
 .cpbtn:hover{background:var(--aglow)}
-.pin-disp{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--amdim);border:1px solid rgba(251,191,36,.2)}
+.pin-disp{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+  border-radius:10px;background:var(--amdim);border:1px solid rgba(251,191,36,.2)}
 .pd-lbl{font-size:11px;color:var(--t2)}.pd-val{font-family:var(--fm);font-size:18px;font-weight:700;letter-spacing:.25em;color:var(--amb)}
-
-/* Incoming / PIN */
-.cring{width:60px;height:60px;border-radius:50%;background:var(--adim);border:2px solid rgba(45,212,191,.3);display:flex;align-items:center;justify-content:center;font-size:24px;animation:bl 1s infinite}
+/* Incoming */
+.cring{width:58px;height:58px;border-radius:50%;background:var(--adim);border:2px solid rgba(45,212,191,.3);
+  display:flex;align-items:center;justify-content:center;font-size:22px;animation:bl 1s infinite}
 .ctitle{font-family:var(--fb);font-size:20px;font-weight:700;letter-spacing:.03em}
 .cpeer{font-family:var(--fm);font-size:11px;color:var(--t2);word-break:break-all}
-.cpinnote{font-size:11px;color:var(--amb);background:var(--amdim);border:1px solid rgba(251,191,36,.2);padding:6px 12px;border-radius:8px;width:100%;text-align:center}
 .jbtns{display:flex;gap:10px;width:100%}
 .jbtn{flex:1;padding:11px 0;border-radius:10px;border:0;cursor:pointer;font-family:var(--fu);font-size:13px;font-weight:700;transition:opacity .13s}
 .jbtn:hover{opacity:.85}
 .jbtn.ok{background:var(--ac);color:#022c22}.jbtn.no{background:var(--bg4);color:var(--t2)}.jbtn.bad{background:var(--rdim);color:var(--red)}
+/* PIN digit input */
 .pin-row{display:flex;gap:8px;justify-content:center}
-.pdig{width:52px;height:58px;text-align:center;border-radius:10px;border:1px solid var(--bd);background:var(--bg0);color:var(--t1);font-family:var(--fm);font-size:22px;font-weight:700;outline:none;transition:border-color .13s;caret-color:var(--ac)}
+.pdig{width:52px;height:56px;text-align:center;border-radius:10px;border:1px solid var(--bd);
+  background:var(--bg0);color:var(--t1);font-family:var(--fm);font-size:22px;font-weight:700;
+  outline:none;transition:border-color .13s;caret-color:var(--ac)}
 .pdig:focus{border-color:var(--ac)}
-
-/* ── LOBBY / NAME ENTRY MODAL ────────────── */
-#lobby-ov .modal{max-width:400px}
-.lobby-modal-body{padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
-.lobby-logo{font-family:var(--fb);font-size:28px;font-weight:700;letter-spacing:.03em}
+/* AI Form display */
+.form-field{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;
+  background:var(--bg3);border:1px solid var(--bd)}
+.ff-label{font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--t3)}
+.ff-value{font-size:13px;line-height:1.6;color:var(--t1);resize:none;background:transparent;
+  border:0;outline:0;font-family:var(--fu);width:100%;min-height:36px}
+/* Lobby */
+#lobby-ov .modal{max-width:380px}
+.lobby-body{padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}
+.lobby-logo{font-family:var(--fb);font-size:26px;font-weight:700;letter-spacing:.03em}
 .lobby-logo em{color:var(--ac);font-style:normal}
-.lobby-desc{font-size:13px;color:var(--t2);line-height:1.6;max-width:300px}
-.lobby-session-name{
-  font-size:15px;font-weight:600;color:var(--t1);
-  padding:8px 16px;border-radius:8px;background:var(--bg3);
-  border:1px solid var(--bd);width:100%;text-align:center;
-}
-.lobby-name-input{
-  width:100%;padding:12px 14px;border-radius:10px;border:2px solid var(--bd);
-  background:var(--bg0);color:var(--t1);font-family:var(--fu);font-size:15px;
-  font-weight:600;outline:none;text-align:center;transition:border-color .15s;
-}
-.lobby-name-input::placeholder{color:var(--t3);font-weight:400}
-.lobby-name-input:focus{border-color:var(--ac)}
-.lobby-join-btn{
-  width:100%;padding:13px 0;border-radius:12px;border:0;
-  background:var(--ac);color:#022c22;font-family:var(--fu);
-  font-size:15px;font-weight:700;cursor:pointer;transition:opacity .13s;
-}
-.lobby-join-btn:hover{opacity:.88}
-.lobby-pin-section{width:100%;display:flex;flex-direction:column;gap:10px;align-items:center}
-.lobby-pin-label{font-size:11px;color:var(--t3)}
+.lobby-sname{font-size:14px;font-weight:600;color:var(--t1);padding:8px 16px;border-radius:8px;
+  background:var(--bg3);border:1px solid var(--bd);width:100%}
+.lobby-in{width:100%;padding:12px 14px;border-radius:10px;border:2px solid var(--bd);
+  background:var(--bg0);color:var(--t1);font-family:var(--fu);font-size:15px;font-weight:600;
+  outline:none;text-align:center;transition:border-color .15s}
+.lobby-in::placeholder{color:var(--t3);font-weight:400}
+.lobby-in:focus{border-color:var(--ac)}
+.lobby-join{width:100%;padding:13px 0;border-radius:12px;border:0;background:var(--ac);color:#022c22;
+  font-family:var(--fu);font-size:15px;font-weight:700;cursor:pointer;transition:opacity .13s}
+.lobby-join:hover{opacity:.88}
+.lobby-desc{font-size:12px;color:var(--t2);line-height:1.6;max-width:280px}
+.lobby-pin-sec{width:100%;display:flex;flex-direction:column;gap:8px;align-items:center}
+.lobby-pin-lbl{font-size:11px;color:var(--t3)}
+.lobby-footer{font-family:var(--fm);font-size:10px;color:var(--t3)}
 .hidden{display:none!important}
 
 @media(max-width:700px){
-  :root{--thumbH:90px}
   .clbl{display:none}.ctl{min-width:44px}.toolbar{gap:2px}
-  .spanel{position:absolute;right:0;top:0;bottom:0;z-index:100;border-radius:0}
+  .spanel{position:absolute;right:0;top:0;bottom:0;z-index:100}
 }
 </style>
 </head>
@@ -366,13 +335,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 <div class="topbar">
   <div class="tb-brand">Strive<em>-Ops</em></div>
   <div class="tb-sep"></div>
-  <div class="tb-sname" id="sname-display">Coaching Session</div>
+  <div class="tb-sname" id="sname-el">Coaching Session</div>
   <div class="tb-pin hidden" id="pin-badge">
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
     PIN Protected
   </div>
   <div class="tb-sep"></div>
-  <div class="tb-timer" id="sess-timer">00:00</div>
+  <div class="tb-timer" id="timer-el">00:00</div>
   <div class="tb-sp"></div>
   <div class="tb-status" id="status-el">Initializing…</div>
   <div class="tb-dot" id="sdot"></div>
@@ -380,58 +349,52 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 
 <!-- MIDDLE -->
 <div class="middle">
+
+  <!-- VIDEO STAGE -->
   <div class="vstage" id="vstage">
 
-    <!-- THUMBNAIL STRIP (cameras always on top) -->
-    <div class="thumb-strip" id="thumb-strip">
+    <!-- CAM ROW — cameras always here, fills stage normally, shrinks when presenting -->
+    <div class="cam-row" id="cam-row">
 
-      <!-- LOCAL THUMB -->
-      <div class="vthumb" id="thumb-local">
+      <div class="vtile" id="tile-local">
         <canvas id="local-canvas"></canvas>
         <div class="tempty" id="local-empty">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3d4e72" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-          <div class="tet">Start Camera</div>
+          <div class="te-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3d4e72" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+          <div class="te-txt">Click <strong style="color:#8494b8">Camera</strong> to begin</div>
         </div>
-        <div class="muted-ico" id="local-mico">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v4M8 23h8"/></svg>
+        <div class="mic-off-ico" id="local-mic-ico">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2"/></svg>
         </div>
-        <div class="th">
-          <div class="tname" id="local-tname">You</div>
+        <div class="tile-hd">
+          <div class="tile-name" id="local-tname">You</div>
           <div class="tbadge b-off" id="local-badge">OFF</div>
         </div>
       </div>
 
-      <!-- REMOTE THUMB -->
-      <div class="vthumb" id="thumb-remote">
+      <div class="vtile" id="tile-remote">
         <video id="remote-video" autoplay playsinline></video>
         <div class="tempty" id="remote-empty">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3d4e72" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07"/><path d="M23 23L1 1"/></svg>
-          <div class="tet">No peer</div>
+          <div class="te-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3d4e72" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07"/><path d="M23 23L1 1"/></svg></div>
+          <div class="te-txt">Waiting for peer…</div>
         </div>
-        <div class="th">
-          <div class="tname" id="remote-tname">Waiting…</div>
+        <div class="tile-hd">
+          <div class="tile-name" id="remote-tname">Peer</div>
           <div class="tbadge b-off" id="remote-badge">—</div>
         </div>
       </div>
 
-    </div><!-- /thumb-strip -->
+    </div><!-- /cam-row -->
 
-    <!-- MAIN CONTENT AREA -->
-    <div class="main-area" id="main-area">
-      <div class="no-share-msg" id="no-share-msg">
-        <div class="no-share-icon">🖥️</div>
-        <div class="no-share-text">
-          Screen share will appear here<br>
-          <span style="font-size:11px;color:var(--t3)">Click <strong style="color:var(--t2)">Share</strong> in the toolbar to present your screen</span>
-        </div>
-      </div>
+    <!-- SCREEN SHARE AREA — only visible in presenting mode -->
+    <div class="share-area" id="share-area">
       <video id="screen-video" autoplay muted playsinline></video>
-      <div class="share-label" id="share-label">
-        <div class="share-dot"></div>
-        SCREEN SHARING
+      <div class="share-banner">
+        <div class="share-dot"></div>SCREEN SHARING
       </div>
-      <button id="tap-play">▶ Tap to Start Playback</button>
     </div>
+
+    <!-- TAP TO PLAY (remote video autoplay blocked) -->
+    <button id="tap-play">▶ Tap to Start Playback</button>
 
   </div><!-- /vstage -->
 
@@ -441,101 +404,69 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
       <div class="ph-title" id="panel-title">Chat</div>
       <button class="ph-x" onclick="closePanel()">×</button>
     </div>
-    <div id="chat-panel">
+
+    <!-- CHAT -->
+    <div id="chat-pnl">
       <div class="cmsg-wrap" id="cmsg-wrap">
-        <div class="cempty" id="cempty">
-          <span style="font-size:26px">💬</span>
-          Messages are sent over your direct peer connection.
-        </div>
+        <div class="cempty" id="cempty"><span style="font-size:26px">💬</span>Messages go over your direct peer connection.</div>
       </div>
-      <div class="cinput-row">
-        <input class="cinput" id="cinput" placeholder="Type a message… (Enter to send)" maxlength="500"/>
+      <div class="cinrow">
+        <input class="cinput" id="cinput" placeholder="Message… (Enter to send)" maxlength="500"/>
         <button class="csend" id="csend">↑</button>
       </div>
     </div>
-    <div id="members-panel">
-      <div class="lobby-section hidden" id="lobby-section">
-        <div class="lobby-label">⏳ Waiting in Lobby</div>
-        <div id="lobby-list"></div>
-      </div>
+
+    <!-- MEMBERS -->
+    <div id="members-pnl">
       <div class="mlist" id="mlist"></div>
     </div>
-  </div>
+
+    <!-- AI / TRANSCRIPT -->
+    <div id="ai-pnl">
+      <div class="ai-toolbar">
+        <button class="ai-btn" id="btn-rec" onclick="toggleTranscript()">🎙 Start Transcript</button>
+        <button class="ai-btn ac" id="btn-form" onclick="generateForm()">✨ Generate Form</button>
+        <button class="ai-btn" id="btn-pdf" onclick="exportPDF()">📄 Export PDF</button>
+      </div>
+      <div class="transcript-wrap" id="tx-wrap">
+        <div class="ai-empty" id="ai-empty">
+          <span style="font-size:26px">🎙</span>
+          <span>Click <strong style="color:#8494b8">Start Transcript</strong> to begin real-time transcription.<br><span style="font-size:10px;color:var(--t3)">Captures your voice — Chrome recommended.</span></span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /spanel -->
 
 </div><!-- /middle -->
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <div class="ctl">
-    <button class="cbtn" id="btn-mic" onclick="toggleMic()" title="Mute/Unmute">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
-    </button>
-    <span class="clbl" id="lbl-mic">Mute</span>
-  </div>
-  <div class="ctl">
-    <button class="cbtn" id="btn-cam" onclick="toggleCamera()" title="Camera On/Off">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-    </button>
-    <span class="clbl" id="lbl-cam">Camera</span>
-  </div>
-  <div class="ctl">
-    <button class="cbtn" id="btn-share" onclick="toggleScreen()" title="Share Screen">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-    </button>
-    <span class="clbl" id="lbl-share">Share</span>
-  </div>
+  <div class="ctl"><button class="cbtn" id="btn-mic" onclick="toggleMic()" title="Mute"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg></button><span class="clbl" id="lbl-mic">Mute</span></div>
+  <div class="ctl"><button class="cbtn" id="btn-cam" onclick="toggleCamera()" title="Camera"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></button><span class="clbl" id="lbl-cam">Camera</span></div>
+  <div class="ctl"><button class="cbtn" id="btn-share" onclick="toggleScreen()" title="Share Screen"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button><span class="clbl" id="lbl-share">Share</span></div>
   <div class="tsep"></div>
-  <div class="ctl">
-    <button class="cbtn" id="btn-chat" onclick="togglePanel('chat')" title="Chat">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      <div class="cbadge" id="chat-badge">0</div>
-    </button>
-    <span class="clbl">Chat</span>
-  </div>
-  <div class="ctl">
-    <button class="cbtn" id="btn-members" onclick="togglePanel('members')" title="Members">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-      <div class="cbadge on" id="members-badge">1</div>
-    </button>
-    <span class="clbl">Members</span>
-  </div>
-  <div class="ctl">
-    <button class="cbtn" id="btn-invite" onclick="openShare()" title="Invite">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-    </button>
-    <span class="clbl">Invite</span>
-  </div>
+  <div class="ctl"><button class="cbtn" id="btn-chat" onclick="togglePanel('chat')" title="Chat"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><div class="cbadge" id="chat-badge">0</div></button><span class="clbl">Chat</span></div>
+  <div class="ctl"><button class="cbtn" id="btn-members" onclick="togglePanel('members')" title="Members"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><div class="cbadge on" id="members-badge">1</div></button><span class="clbl">Members</span></div>
+  <div class="ctl"><button class="cbtn" id="btn-ai" onclick="togglePanel('ai')" title="AI Tools"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 010 2h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 010-2h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/></svg><div class="cbadge" id="ai-badge"></div></button><span class="clbl">AI</span></div>
+  <div class="ctl"><button class="cbtn" id="btn-invite" onclick="openShare()" title="Invite"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button><span class="clbl">Invite</span></div>
   <div class="tsep"></div>
-  <div class="ctl">
-    <button class="cbtn" id="btn-settings" onclick="OV('settings-ov')" title="Settings">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-    </button>
-    <span class="clbl">Settings</span>
-  </div>
-  <div class="ctl">
-    <button class="cbtn end-btn" onclick="hangUp()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.37a19.79 19.79 0 01-3.07-8.63A2 2 0 012.36 0H5a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6 7.91a16 16 0 006.68 5.4z"/></svg>
-      End
-    </button>
-    <span class="clbl">End</span>
-  </div>
+  <div class="ctl"><button class="cbtn" onclick="OV('settings-ov')" title="Settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><span class="clbl">Settings</span></div>
+  <div class="ctl"><button class="cbtn end-btn" onclick="hangUp()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.37a19.79 19.79 0 01-3.07-8.63A2 2 0 012.36 0H5a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6 7.91a16 16 0 006.68 5.4z"/></svg>End</button><span class="clbl">End</span></div>
 </div>
 
 </div><!-- /app -->
 
-<!-- ═══ LOBBY / NAME ENTRY MODAL ═══ -->
+<!-- ══ LOBBY MODAL ════════════════════════════════════════════ -->
 <div class="overlay show" id="lobby-ov">
-<div class="modal" style="max-width:400px">
-  <div class="lobby-modal-body">
+<div class="modal" style="max-width:380px">
+  <div class="lobby-body">
     <div class="lobby-logo">Strive<em>-Ops</em></div>
-    <div class="lobby-session-name" id="lobby-session-label">Coaching Session</div>
-    <div class="lobby-desc">Enter your name to join. The host will be notified and can admit you.</div>
-
-    <input class="lobby-name-input" id="lobby-name-in" placeholder="Your full name…" maxlength="40"
-      onkeydown="if(event.key==='Enter')lobbyJoin()"/>
-
-    <div class="lobby-pin-section hidden" id="lobby-pin-section">
-      <div class="lobby-pin-label">This session requires a PIN from your coach</div>
+    <div class="lobby-sname" id="lobby-sname-el">Coaching Session</div>
+    <div class="lobby-desc" id="lobby-desc">Enter your name to get started.</div>
+    <input class="lobby-in" id="lobby-name" placeholder="Your full name…" maxlength="40" onkeydown="if(event.key==='Enter')lobbyGo()"/>
+    <div class="lobby-pin-sec hidden" id="lobby-pin-sec">
+      <div class="lobby-pin-lbl">Session PIN required by your coach</div>
       <div class="pin-row">
         <input class="pdig" id="lp0" maxlength="1" type="password" inputmode="numeric"/>
         <input class="pdig" id="lp1" maxlength="1" type="password" inputmode="numeric"/>
@@ -543,52 +474,43 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
         <input class="pdig" id="lp3" maxlength="1" type="password" inputmode="numeric"/>
       </div>
     </div>
-
-    <button class="lobby-join-btn" onclick="lobbyJoin()">Join Session</button>
-
-    <div style="font-size:10px;color:var(--t3);font-family:var(--fm)" id="lobby-id-display"></div>
+    <button class="lobby-join" onclick="lobbyGo()" id="lobby-btn">Start Session</button>
+    <div class="lobby-footer" id="lobby-id-footer"></div>
   </div>
 </div>
 </div>
 
-<!-- ═══ SETTINGS MODAL ═══ -->
+<!-- ══ SETTINGS MODAL ════════════════════════════════════════ -->
 <div class="overlay" id="settings-ov">
 <div class="modal" style="max-width:460px">
   <div class="mhd"><div class="mtitle">⚙️ Settings</div><button class="mx" onclick="CO('settings-ov')">×</button></div>
   <div class="mbody">
     <div class="msec">
-      <div class="msec-ttl">Session</div>
-      <div class="mrow"><div class="mlbl">Session Display Name</div>
-        <input class="minp" id="sname-in" placeholder="e.g. Coaching — John Doe"/>
-      </div>
+      <div class="msttl">Session Name</div>
+      <div class="mrow"><input class="minp" id="sname-in" placeholder="e.g. Coaching — John Doe" style="font-family:var(--fu)"/></div>
       <button class="mbtn ac" onclick="applyName()">Apply Name</button>
     </div>
     <div class="msec">
-      <div class="msec-ttl">🔒 Security — Session PIN</div>
+      <div class="msttl">🔒 Session PIN</div>
       <div class="pin-bar"><div class="pdot" id="pdot"></div><span id="pstatus">No PIN — anyone with your link can join</span></div>
-      <div class="mrow"><div class="mlbl">Set PIN (4–6 digits)</div>
-        <input class="minp mono" id="pin-in" type="password" maxlength="6" placeholder="Enter PIN…" inputmode="numeric"/>
-      </div>
-      <div class="mr2">
-        <button class="mbtn ac" onclick="applyPin()">Set PIN</button>
-        <button class="mbtn" onclick="clearPin()">Clear PIN</button>
-      </div>
+      <div class="mrow"><div class="mlbl">Set PIN (4–6 digits)</div><input class="minp" id="pin-in" type="password" maxlength="6" placeholder="Enter digits…" inputmode="numeric" style="letter-spacing:.1em;font-family:var(--fm)"/></div>
+      <div class="mr2"><button class="mbtn ac" onclick="applyPin()">Set PIN</button><button class="mbtn" onclick="clearPin()">Clear PIN</button></div>
     </div>
     <div class="msec">
-      <div class="msec-ttl">📷 Camera</div>
-      <div class="mrow"><div class="mlbl">Active Camera</div>
-        <select id="cam-sel" class="msel"><option>Start camera to detect</option></select>
+      <div class="msttl">🤖 Claude AI Key</div>
+      <div class="mrow"><div class="mlbl">Anthropic API Key (for coaching form generation)</div>
+        <input class="minp" id="api-key-in" type="password" placeholder="sk-ant-…" style="letter-spacing:0;font-family:var(--fm)"/>
       </div>
-      <div class="mr2">
-        <button class="mbtn ac" onclick="switchCam()">Switch Camera</button>
-        <button class="mbtn" onclick="refreshDev()">↻ Refresh</button>
-      </div>
+      <button class="mbtn ac" onclick="saveApiKey()">Save Key (stored locally)</button>
     </div>
     <div class="msec">
-      <div class="msec-ttl">🎤 Microphone</div>
-      <div class="mrow"><div class="mlbl">Active Microphone</div>
-        <select id="mic-sel" class="msel"><option>Start camera to detect</option></select>
-      </div>
+      <div class="msttl">📷 Camera</div>
+      <div class="mrow"><select id="cam-sel" class="msel"><option>Start camera to detect</option></select></div>
+      <div class="mr2"><button class="mbtn ac" onclick="switchCam()">Switch Camera</button><button class="mbtn" onclick="refreshDev()">↻ Refresh</button></div>
+    </div>
+    <div class="msec">
+      <div class="msttl">🎤 Microphone</div>
+      <div class="mrow"><select id="mic-sel" class="msel"><option>Start camera to detect</option></select></div>
       <div class="mrow"><div class="mlbl">Audio Profile</div>
         <select id="aprof-sel" class="msel">
           <option value="standard">Standard — noise cancel on</option>
@@ -599,12 +521,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
       <button class="mbtn ac" onclick="switchMic()">Switch Microphone</button>
     </div>
     <div class="msec">
-      <div class="msec-ttl">🔊 Speaker</div>
+      <div class="msttl">🔊 Speaker</div>
       <div class="mrow"><select id="spk-sel" class="msel"><option value="">Default System Speaker</option></select></div>
       <button class="mbtn" onclick="applySpeaker()">Apply Speaker</button>
     </div>
     <div class="msec">
-      <div class="msec-ttl">✨ Background Effect</div>
+      <div class="msttl">✨ Background Effect</div>
       <div class="mfx">
         <div class="mchip on" id="eff-none" onclick="setFX('none')"><div class="ci">🚫</div><div class="cn">None</div></div>
         <div class="mchip" id="eff-blur" onclick="setFX('blur')"><div class="ci">🌫️</div><div class="cn">Blur</div></div>
@@ -618,27 +540,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 </div>
 </div>
 
-<!-- ═══ SHARE / INVITE MODAL ═══ -->
+<!-- ══ SHARE / INVITE MODAL ══════════════════════════════════ -->
 <div class="overlay" id="share-ov">
 <div class="modal" style="max-width:420px">
   <div class="mhd"><div class="mtitle">🔗 Invite to Session</div><button class="mx" onclick="CO('share-ov')">×</button></div>
   <div class="mbody">
     <div class="msec">
-      <div class="msec-ttl">Your Session ID</div>
-      <div class="sbox"><div class="stext" id="sh-id">—</div><button class="cpbtn" onclick="cpEl('sh-id')">Copy ID</button></div>
+      <div class="msttl">Your Session ID</div>
+      <div class="sbox"><div class="stext" id="sh-id">—</div><button class="cpbtn" onclick="cpEl('sh-id')">Copy</button></div>
     </div>
     <div class="msec">
-      <div class="msec-ttl">Join Link — send this to your client</div>
-      <div class="sbox"><div class="stext" id="sh-link">—</div><button class="cpbtn" onclick="cpEl('sh-link')">Copy Link</button></div>
+      <div class="msttl">Join Link — send this to your client</div>
+      <div class="sbox"><div class="stext" id="sh-link">—</div><button class="cpbtn" onclick="cpEl('sh-link')">Copy</button></div>
     </div>
     <div id="sh-pin-row" class="msec hidden">
-      <div class="msec-ttl">Session PIN — share privately with your client</div>
-      <div class="pin-disp"><span class="pd-lbl">Current PIN:</span><span class="pd-val" id="sh-pin-val">—</span></div>
+      <div class="msttl">Session PIN — share privately</div>
+      <div class="pin-disp"><span class="pd-lbl">PIN:</span><span class="pd-val" id="sh-pin-val">—</span></div>
     </div>
     <div class="msec">
-      <div class="msec-ttl">Connect to a Peer Directly</div>
-      <div class="mrow"><div class="mlbl">Remote Session ID</div>
-        <input class="minp mono" id="remote-id-in" placeholder="so-xxxxxx"/>
+      <div class="msttl">Connect to Peer Directly</div>
+      <div class="mrow"><div class="mlbl">Paste Remote Session ID</div>
+        <input class="minp" id="remote-id-in" placeholder="so-xxxxxx" style="letter-spacing:.1em;font-family:var(--fm)"/>
       </div>
       <button class="mbtn ac" onclick="connectToPeer()">Connect</button>
     </div>
@@ -646,14 +568,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 </div>
 </div>
 
-<!-- ═══ INCOMING CALL MODAL ═══ -->
+<!-- ══ INCOMING CALL ═════════════════════════════════════════ -->
 <div class="overlay" id="incoming-ov">
-<div class="modal" style="max-width:320px">
-  <div class="mbody" style="align-items:center;text-align:center;gap:12px;padding:28px 24px">
+<div class="modal" style="max-width:310px">
+  <div class="mbody" style="align-items:center;text-align:center;gap:12px;padding:28px 22px">
     <div class="cring">📞</div>
     <div class="ctitle">Incoming Session</div>
-    <div class="cpeer" id="caller-display">unknown</div>
-    <div class="cpinnote hidden" id="pin-warn">⚠️ Session is PIN-protected</div>
+    <div class="cpeer" id="caller-el">unknown</div>
     <div class="jbtns">
       <button class="jbtn ok" onclick="acceptCall()">Accept</button>
       <button class="jbtn bad" onclick="declineCall()">Decline</button>
@@ -662,23 +583,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 </div>
 </div>
 
-<!-- ═══ PIN ENTRY FOR JOINERS ═══ -->
-<div class="overlay" id="joinpin-ov">
-<div class="modal" style="max-width:340px">
-  <div class="mbody" style="align-items:center;text-align:center;gap:16px;padding:28px 24px">
-    <div style="font-size:36px">🔒</div>
-    <div class="mtitle">Enter Session PIN</div>
-    <div style="font-size:12px;color:var(--t2)">Enter the PIN provided by your coach.</div>
-    <div class="pin-row">
-      <input class="pdig" id="p0" maxlength="1" type="password" inputmode="numeric"/>
-      <input class="pdig" id="p1" maxlength="1" type="password" inputmode="numeric"/>
-      <input class="pdig" id="p2" maxlength="1" type="password" inputmode="numeric"/>
-      <input class="pdig" id="p3" maxlength="1" type="password" inputmode="numeric"/>
-    </div>
-    <div class="jbtns">
-      <button class="jbtn ok" onclick="submitPin()">Join</button>
-      <button class="jbtn no" onclick="CO('joinpin-ov')">Cancel</button>
-    </div>
+<!-- ══ AI COACHING FORM MODAL ════════════════════════════════ -->
+<div class="overlay" id="form-ov">
+<div class="modal" style="max-width:520px">
+  <div class="mhd"><div class="mtitle">📋 Coaching Form</div><button class="mx" onclick="CO('form-ov')">×</button></div>
+  <div class="mbody" id="form-body">
+    <div style="font-size:12px;color:var(--t3);text-align:center">Generating form from transcript…</div>
+  </div>
+  <div style="padding:12px 20px;border-top:1px solid var(--bd);display:flex;gap:8px">
+    <button class="mbtn ac" style="width:auto;padding:9px 18px" onclick="exportPDF()">📄 Export PDF</button>
+    <button class="mbtn" style="width:auto;padding:9px 18px" onclick="CO('form-ov')">Close</button>
   </div>
 </div>
 </div>
@@ -687,107 +601,105 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 <canvas id="bg-canvas" class="hidden"></canvas>
 
 <script>
-// ═══ STATE ═══════════════════════════════════════════════════════
-let peer=null,localStream=null,outbound=null,currentCall=null;
-let pendingCall=null,pendingRemote=null,dataConn=null;
-let seg=null,canStream=null,pipeOn=false;
-let fx="none",customBG=null,aprof="standard",sPin="";
-let micMuted=false,camOff=false,sharing=false,screenStream=null;
-let activePanel=null,unread=0,timerInt=null;
-let myName="",remoteName="",pendingConnId=null;
-let lobbyQueue=[]; // {name, peerId} waiting to be admitted
-
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let peer=null, localStream=null, outbound=null, currentCall=null;
+let pendingCall=null, pendingRemote=null, dataConn=null;
+let seg=null, canStream=null, pipeOn=false;
+let fx="none", customBG=null, aprof="standard", sPin="";
+let micMuted=false, camOff=false, sharing=false, screenStream=null;
+let activePanel=null, unread=0, timerInt=null;
+let myName="", remoteName="";
+let transcript=[], recognition=null, txActive=false, txInterimEl=null;
+let coachingForm=null;
 const G=id=>document.getElementById(id);
 
-// ═══ INIT ════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
 window.addEventListener("load",()=>{
   G("csend").addEventListener("click",sendChat);
   G("cinput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();}});
   G("bg-file").addEventListener("change",handleBG);
-  ["p0","p1","p2","p3"].forEach((id,i)=>{
-    G(id).addEventListener("input",e=>{if(e.target.value&&i<3)G(["p0","p1","p2","p3"][i+1]).focus();});
-  });
+  // lobby PIN digit advance
   ["lp0","lp1","lp2","lp3"].forEach((id,i)=>{
     G(id).addEventListener("input",e=>{if(e.target.value&&i<3)G(["lp0","lp1","lp2","lp3"][i+1]).focus();});
   });
-  G("lobby-name-in").focus();
-  loadURLPrep(); // check URL params before peer is ready
+  // load saved API key
+  const saved=localStorage.getItem("so_api_key");
+  if(saved)G("api-key-in").value=saved;
+  readURL();
   createPeer();
   initSeg();
   st("Loading…");
 });
 
-// ═══ URL PREP — read params before peer opens ════════════════════
-function loadURLPrep(){
+// ═══════════════════════════════════════════════════════════════
+//  URL PARAMS — read before peer opens
+// ═══════════════════════════════════════════════════════════════
+function readURL(){
   const p=new URLSearchParams(location.search);
-  const join=p.get("join");
-  const sname=p.get("sname");
-  const pin=p.get("pin");
-
+  const join=p.get("join"), sname=p.get("sname"), pin=p.get("pin");
   if(join){
-    // Auto-fill remote ID in share modal
     G("remote-id-in").value=join;
-    // Show session name if encoded in URL
-    if(sname){
-      const decoded=decodeURIComponent(sname);
-      G("lobby-session-label").textContent=decoded;
-      G("sname-display").textContent=decoded;
-    }
-    // If PIN required, show PIN fields in lobby
+    const label=sname?decodeURIComponent(sname):"Coaching Session";
+    G("lobby-sname-el").textContent=label;
+    G("sname-el").textContent=label;
+    G("lobby-desc").textContent="Enter your name to join this session.";
+    G("lobby-btn").textContent="Join Session";
     if(pin){
-      G("lobby-pin-section").classList.remove("hidden");
-      const d=pin.split("").slice(0,4);
-      ["lp0","lp1","lp2","lp3"].forEach((id,idx)=>{G(id).value=d[idx]||"";});
+      G("lobby-pin-sec").classList.remove("hidden");
+      pin.split("").slice(0,4).forEach((d,i)=>{G("lp"+i).value=d;});
     }
   } else {
-    // Host — skip lobby, go straight in
-    CO("lobby-ov");
-    // Show lobby ID hint
-    G("lobby-id-display").textContent="";
+    // Host path — just name entry, no PIN
+    G("lobby-desc").textContent="Enter your name to start your session.";
+    G("lobby-btn").textContent="Start Session";
   }
 }
 
-// ═══ LOBBY — name entry flow ═════════════════════════════════════
-function lobbyJoin(){
-  const name=G("lobby-name-in").value.trim();
-  if(!name){G("lobby-name-in").style.borderColor="var(--red)";G("lobby-name-in").placeholder="Please enter your name";return;}
+// ═══════════════════════════════════════════════════════════════
+//  LOBBY
+// ═══════════════════════════════════════════════════════════════
+function lobbyGo(){
+  const name=G("lobby-name").value.trim();
+  if(!name){
+    G("lobby-name").style.borderColor="var(--red)";
+    G("lobby-name").placeholder="Please enter your name";
+    return;
+  }
   myName=name;
   G("local-tname").textContent=name;
-
   const p=new URLSearchParams(location.search);
-  const join=p.get("join");
-
+  const join=p.get("join"), pin=p.get("pin");
   if(join){
-    // Joiner — check PIN if required
-    const pin=p.get("pin");
+    // Validate PIN if required
     if(pin){
       const entered=["lp0","lp1","lp2","lp3"].map(id=>G(id).value).join("");
       if(entered!==pin){
-        G("lp0").style.borderColor="var(--red)";
-        G("lp1").style.borderColor="var(--red)";
-        G("lp2").style.borderColor="var(--red)";
-        G("lp3").style.borderColor="var(--red)";
+        ["lp0","lp1","lp2","lp3"].forEach(id=>G(id).style.borderColor="var(--red)");
         st("Incorrect PIN — check with your coach.");
         return;
       }
     }
     CO("lobby-ov");
-    st("Connecting to session…");
-    // Wait for peer to be ready then connect
-    const wait=setInterval(()=>{
-      if(G("sdot").dataset.id){
-        clearInterval(wait);
-        doConnect(join,pin||"",name);
-      }
-    },200);
+    st("Connecting…");
+    waitForPeerThen(()=>doConnect(join, pin||"", name));
   } else {
-    // Host entering their name
     CO("lobby-ov");
-    st("Session ready — invite clients via the Invite button.");
+    st("Session ready. Share your invite link to get clients in.");
   }
 }
 
-// ═══ HELPERS ═════════════════════════════════════════════════════
+function waitForPeerThen(fn){
+  if(G("sdot").dataset.id){fn();}
+  else{const t=setInterval(()=>{if(G("sdot").dataset.id){clearInterval(t);fn();}},200);}
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════════
 function st(m){G("status-el").textContent=m;}
 function dot(s){G("sdot").className="tb-dot"+(s?" "+s:"");}
 function OV(id){G(id).classList.add("show");}
@@ -795,12 +707,10 @@ function CO(id){G(id).classList.remove("show");}
 
 function openShare(){
   const myId=G("sdot").dataset.id||"";
-  G("sh-id").textContent=myId||"Not ready yet";
-  const sname=encodeURIComponent(G("sname-display").textContent);
+  G("sh-id").textContent=myId||"Not ready";
+  const sname=encodeURIComponent(G("sname-el").textContent);
   const pinParam=sPin?`&pin=${sPin}`:"";
-  G("sh-link").textContent=myId
-    ?`${location.origin}${location.pathname}?join=${myId}&sname=${sname}${pinParam}`
-    :"Not ready yet";
+  G("sh-link").textContent=myId?`${location.origin}${location.pathname}?join=${myId}&sname=${sname}${pinParam}`:"Not ready";
   const pr=G("sh-pin-row");
   if(sPin){pr.classList.remove("hidden");G("sh-pin-val").textContent=sPin;}
   else pr.classList.add("hidden");
@@ -822,119 +732,137 @@ function showRemote(v){
   dot(v?"live":localStream?"on":"");
 }
 
-// ═══ TIMER ═══════════════════════════════════════════════════════
 function startTimer(){
   if(timerInt)return;
   const t0=Date.now();
   timerInt=setInterval(()=>{
     const s=Math.floor((Date.now()-t0)/1000);
-    G("sess-timer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+    G("timer-el").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
   },1000);
 }
-function stopTimer(){if(timerInt){clearInterval(timerInt);timerInt=null;}G("sess-timer").textContent="00:00";}
+function stopTimer(){if(timerInt){clearInterval(timerInt);timerInt=null;}G("timer-el").textContent="00:00";}
 
-// ═══ PEER ════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  PEER
+// ═══════════════════════════════════════════════════════════════
 function createPeer(){
   const id="so-"+Math.random().toString(36).slice(2,9);
   peer=new Peer(id,{host:"0.peerjs.com",port:443,secure:true});
-
   peer.on("open",v=>{
-    G("sdot").dataset.id=v;dot("on");
+    G("sdot").dataset.id=v; dot("on");
     st("Ready — "+v);
-    G("lobby-id-display").textContent="Session: "+v;
+    G("lobby-id-footer").textContent="Session: "+v;
     updateMembers();
   });
-
   peer.on("call",inc=>{
     pendingCall=inc;
     const callerName=inc.metadata?.name||inc.peer.slice(0,14);
-    G("caller-display").textContent=callerName;
-    if(sPin&&inc.metadata?.pin!==sPin){G("pin-warn").classList.remove("hidden");}
-    else G("pin-warn").classList.add("hidden");
-    OV("incoming-ov");dot("ring");
-    st("Incoming session from "+callerName);
+    G("caller-el").textContent=callerName+" is joining…";
+    OV("incoming-ov"); dot("ring");
+    st("Incoming from "+callerName);
   });
-
   peer.on("connection",conn=>{
-    // Data channel from joiner — get their name
-    conn.on("open",()=>{
-      conn.send({type:"hello",name:myName});
-    });
-    conn.on("data",d=>{
-      if(d.type==="hello"){
-        // Update remote name in UI
-        remoteName=d.name||"Peer";
-        G("remote-tname").textContent=remoteName;
-        updateMembers();
-        // Send back our name
-        if(myName)conn.send({type:"hello",name:myName});
-      }
-      if(d.type==="chat")appendMsg({text:d.text,from:"them",fromName:remoteName||"Peer",ts:d.ts||Date.now()});
-    });
-    conn.on("close",()=>{dataConn=null;remoteName="";G("remote-tname").textContent="Waiting…";updateMembers();});
-    if(!dataConn)dataConn=conn;
-    updateMembers();
+    setupDataConn(conn);
   });
-
   peer.on("error",e=>{console.error(e);st("Peer error: "+(e.type||"?"));dot("");});
 }
 
-// ═══ SEGMENTATION ════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  DATA CHANNEL — name exchange + chat
+// ═══════════════════════════════════════════════════════════════
+function setupDataConn(conn){
+  conn.on("open",()=>{
+    dataConn=conn;
+    // Always send our name immediately
+    conn.send({type:"hello",name:myName});
+    updateMembers();
+  });
+  conn.on("data",d=>{
+    if(!d)return;
+    if(d.type==="hello"){
+      // Update remote name everywhere
+      remoteName=d.name||"Peer";
+      G("remote-tname").textContent=remoteName;
+      updateMembers();
+    }
+    if(d.type==="chat") appendMsg({text:d.text,from:"them",who:remoteName||"Peer",ts:d.ts||Date.now()});
+  });
+  conn.on("close",()=>{dataConn=null;remoteName="";G("remote-tname").textContent="Peer";updateMembers();});
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEGMENTATION
+// ═══════════════════════════════════════════════════════════════
 function initSeg(){
   seg=new SelfieSegmentation({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`});
   seg.setOptions({modelSelection:1});
   seg.onResults(onSeg);
 }
 
-// ═══ CAMERA ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  CAMERA
+// ═══════════════════════════════════════════════════════════════
 async function startCamera(){
   try{
     const s=await navigator.mediaDevices.getUserMedia({video:true,audio:aC(aprof)});
-    await applyStream(s);await loadDevs();
-    camOff=false;G("btn-cam").classList.remove("muted");G("lbl-cam").textContent="Camera";
+    await applyStream(s);
+    await loadDevs();
+    camOff=false;
+    G("btn-cam").classList.remove("muted");
+    G("lbl-cam").textContent="Camera";
     st("Camera on.");
   }catch(e){console.error(e);st("Camera error: "+e.message);alert("Camera/mic access denied.");}
 }
 
 async function applyStream(s){
-  stopTracks();localStream=s;
+  stopTracks();
+  localStream=s;
   const rv=G("raw-video");rv.srcObject=s;rv.muted=true;
   await rv.play().catch(()=>{});
-  await buildPipe();showLocal(true);updateMembers();updateMicUI();
+  await buildPipe();
+  showLocal(true);updateMembers();updateMicUI();
 }
 
 async function buildPipe(){
   const vt=localStream.getVideoTracks()[0];
-  const ss=vt?.getSettings()||{};const w=ss.width||1280,h=ss.height||720;
-  const lc=G("local-canvas"),bc=G("bg-canvas");
+  const ss=vt?.getSettings()||{};
+  const w=ss.width||1280, h=ss.height||720;
+  const lc=G("local-canvas"), bc=G("bg-canvas");
   lc.width=w;lc.height=h;bc.width=w;bc.height=h;
   if(canStream)canStream.getTracks().forEach(t=>t.stop());
-  canStream=lc.captureStream(25);rebuildOut();
-  if(!pipeOn){pipeOn=true;loop();}
+  canStream=lc.captureStream(25);
+  rebuildOut();
+  if(!pipeOn){pipeOn=true;pipeLoop();}
 }
 
 function rebuildOut(){
   if(!canStream)return;
-  const vid=canStream.getVideoTracks()[0],aud=localStream?.getAudioTracks()[0]||null;
+  const vid=canStream.getVideoTracks()[0];
+  const aud=localStream?.getAudioTracks()[0]||null;
   outbound=new MediaStream();
-  if(vid)outbound.addTrack(vid);if(aud)outbound.addTrack(aud);
+  if(vid)outbound.addTrack(vid);
+  if(aud)outbound.addTrack(aud);
   replaceSnd();
 }
 
 async function replaceSnd(){
   if(!currentCall?.peerConnection||!outbound)return;
   const snds=currentCall.peerConnection.getSenders();
-  const nv=outbound.getVideoTracks()[0],na=outbound.getAudioTracks()[0];
-  const vs=snds.find(s=>s.track?.kind==="video"),as=snds.find(s=>s.track?.kind==="audio");
+  const nv=outbound.getVideoTracks()[0], na=outbound.getAudioTracks()[0];
+  const vs=snds.find(s=>s.track?.kind==="video"), as=snds.find(s=>s.track?.kind==="audio");
   try{if(vs&&nv)await vs.replaceTrack(nv);if(as&&na)await as.replaceTrack(na);}
-  catch(e){console.error(e);}
+  catch(e){console.error("replaceSnd:",e);}
 }
 
-async function loop(){
+// Pipeline loop — runs ALWAYS, even during screen share (keeps local preview alive)
+async function pipeLoop(){
   if(!pipeOn)return;
   const rv=G("raw-video");
-  if(rv.readyState>=2&&seg&&!sharing){try{await seg.send({image:rv});}catch(e){}}
-  requestAnimationFrame(loop);
+  // Always process camera — screen share only affects what we SEND, not the local preview
+  if(rv.readyState>=2&&seg){
+    try{await seg.send({image:rv});}catch(e){}
+  }
+  requestAnimationFrame(pipeLoop);
 }
 
 function onSeg(r){
@@ -942,12 +870,15 @@ function onSeg(r){
   ctx.save();ctx.clearRect(0,0,w,h);
   if(fx==="none"){ctx.drawImage(r.image,0,0,w,h);}
   else if(fx==="blur"){
-    ctx.drawImage(r.segmentationMask,0,0,w,h);ctx.globalCompositeOperation="source-out";
-    ctx.filter="blur(15px)";ctx.drawImage(r.image,0,0,w,h);
-    ctx.globalCompositeOperation="destination-atop";ctx.filter="none";ctx.drawImage(r.image,0,0,w,h);
+    ctx.drawImage(r.segmentationMask,0,0,w,h);
+    ctx.globalCompositeOperation="source-out";ctx.filter="blur(15px)";
+    ctx.drawImage(r.image,0,0,w,h);
+    ctx.globalCompositeOperation="destination-atop";ctx.filter="none";
+    ctx.drawImage(r.image,0,0,w,h);
   }else if(fx==="solid"){
-    ctx.fillStyle="#080c1a";ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation="destination-out";
-    ctx.drawImage(r.segmentationMask,0,0,w,h);ctx.globalCompositeOperation="destination-over";ctx.drawImage(r.image,0,0,w,h);
+    ctx.fillStyle="#080c1a";ctx.fillRect(0,0,w,h);
+    ctx.globalCompositeOperation="destination-out";ctx.drawImage(r.segmentationMask,0,0,w,h);
+    ctx.globalCompositeOperation="destination-over";ctx.drawImage(r.image,0,0,w,h);
   }else if(fx==="image"){
     if(customBG)ctx.drawImage(customBG,0,0,w,h);
     else{ctx.fillStyle="#1e3a8a";ctx.fillRect(0,0,w,h);}
@@ -957,20 +888,20 @@ function onSeg(r){
   ctx.restore();
 }
 
-// ═══ SCREEN SHARE ════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  SCREEN SHARE — cameras stay in strip, screen fills main area
+// ═══════════════════════════════════════════════════════════════
 async function toggleScreen(){
-  if(!localStream){st("Start your camera before sharing screen.");return;}
-  if(sharing){stopScreen();return;}
+  if(!localStream){st("Start camera before sharing screen.");return;}
+  if(sharing){await stopScreen();return;}
   try{
     screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:"always"},audio:false});
     const sT=screenStream.getVideoTracks()[0];
-    // Wire screen video into main-area
-    const sv=G("screen-video");sv.srcObject=screenStream;sv.style.display="block";
-    G("no-share-msg").style.display="none";
-    G("share-label").classList.add("show");
-    // Enter presentation mode: cameras shrink to top strip, screen fills stage
+    // Wire screen into share-area
+    const sv=G("screen-video");sv.srcObject=screenStream;
+    // Activate presentation layout: cam-row shrinks, share-area appears
     G("vstage").classList.add("presenting");
-    // Hot-swap to screen track for remote peer
+    // Hot-swap only the SENDER track — camera pipeline keeps running locally
     if(currentCall?.peerConnection){
       const snd=currentCall.peerConnection.getSenders().find(s=>s.track?.kind==="video");
       if(snd)await snd.replaceTrack(sT);
@@ -978,8 +909,9 @@ async function toggleScreen(){
     sharing=true;
     G("btn-share").classList.add("sharing");
     G("lbl-share").textContent="Stop Share";
+    // Auto-stop when browser stop button is clicked
     sT.addEventListener("ended",stopScreen);
-    st("Screen sharing active.");
+    st("Screen sharing — camera preview still running above.");
   }catch(e){
     if(e.name!=="NotAllowedError"){console.error(e);st("Screen share error: "+e.message);}
     else st("Screen share cancelled.");
@@ -988,12 +920,12 @@ async function toggleScreen(){
 
 async function stopScreen(){
   if(!sharing)return;
-  screenStream?.getTracks().forEach(t=>t.stop());screenStream=null;
-  const sv=G("screen-video");sv.srcObject=null;sv.style.display="none";
-  G("share-label").classList.remove("show");
-  // Exit presentation mode — cameras expand back to full-size tiles
+  screenStream?.getTracks().forEach(t=>t.stop());
+  screenStream=null;
+  G("screen-video").srcObject=null;
+  // Exit presentation mode — cameras expand back to fill stage
   G("vstage").classList.remove("presenting");
-  // Restore canvas camera track for remote peer
+  // Restore camera canvas track to sender
   if(currentCall?.peerConnection&&canStream){
     const snd=currentCall.peerConnection.getSenders().find(s=>s.track?.kind==="video");
     if(snd)await snd.replaceTrack(canStream.getVideoTracks()[0]).catch(()=>{});
@@ -1004,29 +936,37 @@ async function stopScreen(){
   st("Screen sharing stopped.");
 }
 
-// ═══ MIC / CAM ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  MIC / CAM TOGGLE
+// ═══════════════════════════════════════════════════════════════
 async function toggleCamera(){
   if(!localStream){await startCamera();return;}
   camOff=!camOff;
   localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);
-  G("btn-cam").classList.toggle("muted",camOff);G("lbl-cam").textContent=camOff?"Start Cam":"Camera";
-  showLocal(!camOff);st(camOff?"Camera paused.":"Camera on.");
+  G("btn-cam").classList.toggle("muted",camOff);
+  G("lbl-cam").textContent=camOff?"Start Cam":"Camera";
+  showLocal(!camOff);
+  st(camOff?"Camera paused.":"Camera on.");
 }
 
 function toggleMic(){
   if(!localStream){st("Start camera first.");return;}
   const t=localStream.getAudioTracks()[0];if(!t){st("No mic track.");return;}
   micMuted=!micMuted;t.enabled=!micMuted;
-  updateMicUI();G("local-mico").classList.toggle("show",micMuted);
-  st(micMuted?"Microphone muted.":"Microphone unmuted.");
+  updateMicUI();
+  G("local-mic-ico").classList.toggle("show",micMuted);
+  st(micMuted?"Mic muted.":"Mic on.");
 }
 
 function updateMicUI(){
-  const t=localStream?.getAudioTracks()[0],m=t?!t.enabled:false;
-  G("btn-mic").classList.toggle("muted",m);G("lbl-mic").textContent=m?"Unmute":"Mute";
+  const t=localStream?.getAudioTracks()[0], m=t?!t.enabled:false;
+  G("btn-mic").classList.toggle("muted",m);
+  G("lbl-mic").textContent=m?"Unmute":"Mute";
 }
 
-// ═══ DEVICES ═════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  DEVICES
+// ═══════════════════════════════════════════════════════════════
 async function loadDevs(){
   const d=await navigator.mediaDevices.enumerateDevices().catch(()=>[]);
   fillS(G("cam-sel"),d.filter(x=>x.kind==="videoinput"),"Camera");
@@ -1039,21 +979,17 @@ async function loadDevs(){
     if(as?.deviceId)G("mic-sel").value=as.deviceId;
   }
 }
-
-function fillS(sel,devs,lbl,addDef=false){
+function fillS(sel,devs,lbl,def=false){
   sel.innerHTML="";
-  if(addDef)sel.add(new Option("Default System "+lbl,""));
+  if(def)sel.add(new Option("Default System "+lbl,""));
   if(!devs.length){sel.add(new Option("No "+lbl+" found",""));return;}
   devs.forEach((d,i)=>sel.add(new Option(d.label||lbl+" "+(i+1),d.deviceId)));
 }
-
 async function refreshDev(){if(!localStream){st("Start camera first.");return;}await loadDevs();st("Devices refreshed.");}
-
 async function switchCam(){
   if(!localStream){st("Start camera first.");return;}
-  const id=G("cam-sel").value;if(!id){st("Select a camera.");return;}
-  const cur=localStream.getVideoTracks()[0]?.getSettings()?.deviceId;
-  if(id===cur){st("Already using that camera.");return;}
+  const id=G("cam-sel").value;if(!id)return;
+  if(id===localStream.getVideoTracks()[0]?.getSettings()?.deviceId){st("Already on that camera.");return;}
   st("Switching camera…");
   try{
     const ns=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:id}},audio:false});
@@ -1061,14 +997,14 @@ async function switchCam(){
     localStream.getVideoTracks().forEach(t=>{t.stop();localStream.removeTrack(t);});
     localStream.addTrack(nt);
     const rv=G("raw-video");rv.srcObject=null;rv.srcObject=localStream;
-    await rv.play().catch(()=>{});await buildPipe();showLocal(true);
+    await rv.play().catch(()=>{});
+    await buildPipe();showLocal(true);
     st("Camera: "+(nt.label||id));
   }catch(e){st("Camera switch failed: "+e.message);}
 }
-
 async function switchMic(){
   if(!localStream){st("Start camera first.");return;}
-  const id=G("mic-sel").value;if(!id){st("Select a mic.");return;}
+  const id=G("mic-sel").value;if(!id)return;
   st("Switching mic…");
   try{
     const ns=await navigator.mediaDevices.getUserMedia({video:false,audio:aC(G("aprof-sel").value,id)});
@@ -1078,14 +1014,12 @@ async function switchMic(){
     st("Mic: "+(nt.label||id));
   }catch(e){st("Mic switch failed: "+e.message);}
 }
-
 async function applySpeaker(){
   const rv=G("remote-video");
-  if(typeof rv.setSinkId!=="function"){st("Speaker switching not supported here.");return;}
+  if(typeof rv.setSinkId!=="function"){st("Speaker switching not supported here (use Chrome).");return;}
   try{await rv.setSinkId(G("spk-sel").value||"");st("Speaker updated.");}
   catch(e){st("Speaker error: "+e.message);}
 }
-
 function aC(p,id=null){
   const b=id?{deviceId:{exact:id}}:{};
   if(p==="voice")return{...b,echoCancellation:true,noiseSuppression:true,autoGainControl:true};
@@ -1093,7 +1027,9 @@ function aC(p,id=null){
   return{...b,echoCancellation:true,noiseSuppression:true,autoGainControl:true};
 }
 
-// ═══ EFFECTS ═════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  EFFECTS
+// ═══════════════════════════════════════════════════════════════
 function setFX(m){
   if(m==="image"&&!customBG){G("bg-file").click();return;}
   fx=m;["none","blur","solid","image"].forEach(k=>G("eff-"+k).classList.toggle("on",k===m));
@@ -1107,7 +1043,9 @@ function handleBG(e){
   img.src=url;
 }
 
-// ═══ CALL FLOW ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  CALL FLOW
+// ═══════════════════════════════════════════════════════════════
 function connectToPeer(){
   CO("share-ov");
   const rid=G("remote-id-in").value.trim();
@@ -1115,32 +1053,15 @@ function connectToPeer(){
   doConnect(rid,"",myName);
 }
 
-function submitPin(){
-  const pin=["p0","p1","p2","p3"].map(id=>G(id).value).join("").trim();
-  CO("joinpin-ov");
-  if(!pendingConnId)return;
-  doConnect(pendingConnId,pin,myName);
-  pendingConnId=null;
-}
-
 function doConnect(rid,pin,name){
   if(currentCall){currentCall.close();currentCall=null;}
   st("Connecting to "+rid+"…");dot("ring");
-  // Data channel — exchange names
+  // Data channel first for name exchange
   try{
     const dc=peer.connect(rid);
-    dc.on("open",()=>{
-      dataConn=dc;
-      dc.send({type:"hello",name:name||myName});
-      updateMembers();
-    });
-    dc.on("data",d=>{
-      if(d.type==="hello"){remoteName=d.name||"Peer";G("remote-tname").textContent=remoteName;updateMembers();}
-      if(d.type==="chat")appendMsg({text:d.text,from:"them",fromName:remoteName||"Peer",ts:d.ts||Date.now()});
-    });
-    dc.on("close",()=>{dataConn=null;remoteName="";G("remote-tname").textContent="Waiting…";updateMembers();});
+    setupDataConn(dc);
   }catch(e){console.warn("DataCh:",e);}
-  // Media call
+  // Media call — pass name in metadata
   try{
     currentCall=peer.call(rid,outbound||undefined,{metadata:{pin,name:name||myName}});
     wireCall(currentCall);
@@ -1152,10 +1073,12 @@ function acceptCall(){
   if(currentCall){currentCall.close();currentCall=null;}
   currentCall=pendingCall;pendingCall=null;
   CO("incoming-ov");
-  const callerName=currentCall.metadata?.name||currentCall.peer.slice(0,14);
-  remoteName=callerName;G("remote-tname").textContent=callerName;
+  // Set remote name from metadata BEFORE anything else
+  const callerName=currentCall.metadata?.name||"";
+  if(callerName){remoteName=callerName;G("remote-tname").textContent=callerName;}
   currentCall.answer(outbound||undefined);
-  wireCall(currentCall);st("Session accepted.");
+  wireCall(currentCall);
+  st("Session accepted.");
 }
 
 function declineCall(){
@@ -1165,13 +1088,19 @@ function declineCall(){
 
 function wireCall(call){
   call.on("stream",remote=>{
-    pendingRemote=remote;attachRemote(remote);startTimer();updateMembers();
+    pendingRemote=remote;
+    attachRemote(remote);
+    startTimer();
+    // Only set peer ID as name fallback if we don't already have a real name
+    if(!remoteName)G("remote-tname").textContent=call.peer.slice(0,12)+"…";
+    updateMembers();
   });
   call.on("close",()=>{
-    clearRemote();CO("incoming-ov");pendingCall=null;stopTimer();
-    remoteName="";G("remote-tname").textContent="Waiting…";
+    clearRemote();CO("incoming-ov");pendingCall=null;
+    stopTimer();remoteName="";G("remote-tname").textContent="Peer";
     updateMembers();st("Session ended.");
-    if(sharing)stopScreen();dot(localStream?"on":"");
+    if(sharing)stopScreen();
+    dot(localStream?"on":"");
   });
   call.on("error",e=>{console.error(e);st("Call error: "+e.type);});
 }
@@ -1179,15 +1108,16 @@ function wireCall(call){
 function attachRemote(stream){
   const rv=G("remote-video");rv.srcObject=stream;rv.playsInline=true;rv.muted=false;
   showRemote(true);
-  const pp=G("tap-play");
-  const p=rv.play();
-  if(p?.then)p.then(()=>{pp.style.display="none";st("Remote feed connected.");})
-    .catch(()=>{pp.style.display="block";st("Tap to start playback.");});
-  pp.onclick=()=>{rv.play().then(()=>{pp.style.display="none";});};
+  const tp=G("tap-play");
+  const pp=rv.play();
+  if(pp?.then)pp.then(()=>{tp.style.display="none";st("Connected.");})
+    .catch(()=>{tp.style.display="block";st("Tap to start playback.");});
+  tp.onclick=()=>{rv.play().then(()=>{tp.style.display="none";});};
 }
 
 function clearRemote(){
-  G("remote-video").srcObject=null;pendingRemote=null;showRemote(false);G("tap-play").style.display="none";
+  G("remote-video").srcObject=null;pendingRemote=null;
+  showRemote(false);G("tap-play").style.display="none";
 }
 
 function hangUp(){
@@ -1195,16 +1125,19 @@ function hangUp(){
   if(currentCall){currentCall.close();currentCall=null;}
   if(dataConn){dataConn.close();dataConn=null;}
   if(sharing)stopScreen();
+  if(txActive)stopTranscript();
   CO("incoming-ov");clearRemote();stopTimer();
-  remoteName="";G("remote-tname").textContent="Waiting…";
+  remoteName="";G("remote-tname").textContent="Peer";
   updateMembers();dot(localStream?"on":"");st("Session ended.");
 }
 
-// ═══ CHAT ════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  CHAT
+// ═══════════════════════════════════════════════════════════════
 function sendChat(){
   const inp=G("cinput"),text=inp.value.trim();if(!text)return;
   if(dataConn?.open)dataConn.send({type:"chat",text,from:"me",ts:Date.now()});
-  appendMsg({text,from:"me",fromName:myName||"You",ts:Date.now()});
+  appendMsg({text,from:"me",who:myName||"You",ts:Date.now()});
   inp.value="";
 }
 
@@ -1214,32 +1147,35 @@ function appendMsg(msg){
   const d=document.createElement("div");
   d.className="cmsg "+(msg.from==="me"?"me":"them");
   const t=new Date(msg.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-  d.innerHTML=`<div class="cbubble">${esc(msg.text)}</div><div class="cmeta">${esc(msg.fromName)} · ${t}</div>`;
+  d.innerHTML=`<div class="cbubble">${esc(msg.text)}</div><div class="cmeta">${esc(msg.who)} · ${t}</div>`;
   w.appendChild(d);w.scrollTop=w.scrollHeight;
   if(activePanel!=="chat"&&msg.from!=="me"){
     unread++;const b=G("chat-badge");b.textContent=unread;b.classList.add("on");
   }
 }
 
-function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
-
-// ═══ PANELS ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  PANELS
+// ═══════════════════════════════════════════════════════════════
 function togglePanel(name){
   if(activePanel===name){closePanel();return;}
   activePanel=name;
   G("spanel").classList.add("open");
-  G("panel-title").textContent=name==="chat"?"💬 Chat":"👥 Members";
-  G("chat-panel").style.display=name==="chat"?"flex":"none";
-  G("members-panel").style.display=name==="members"?"flex":"none";
+  const titles={chat:"💬 Chat",members:"👥 Members",ai:"🤖 AI Tools"};
+  G("panel-title").textContent=titles[name]||name;
+  G("chat-pnl").style.display=name==="chat"?"flex":"none";
+  G("members-pnl").style.display=name==="members"?"flex":"none";
+  G("ai-pnl").style.display=name==="ai"?"flex":"none";
   G("btn-chat").classList.toggle("active",name==="chat");
   G("btn-members").classList.toggle("active",name==="members");
+  G("btn-ai").classList.toggle("active",name==="ai");
   if(name==="chat"){unread=0;G("chat-badge").classList.remove("on");setTimeout(()=>G("cinput").focus(),100);}
   if(name==="members")updateMembers();
 }
 
 function closePanel(){
   activePanel=null;G("spanel").classList.remove("open");
-  G("btn-chat").classList.remove("active");G("btn-members").classList.remove("active");
+  ["chat","members","ai"].forEach(n=>G("btn-"+n)?.classList.remove("active"));
 }
 
 function updateMembers(){
@@ -1248,15 +1184,13 @@ function updateMembers(){
   G("members-badge").textContent=1+(rmId?1:0);
   const mic=localStream?.getAudioTracks()[0]?.enabled!==false;
   const cam=!!localStream&&!camOff;
-  let html=mCard(myId,myName||"You (Host)",mic,cam);
-  if(rmId)html+=mCard(rmId,remoteName||"Peer",true,true);
-  G("mlist").innerHTML=html;
+  G("mlist").innerHTML=mCard(myId,myName||"You (Host)",mic,cam)+(rmId?mCard(rmId,remoteName||"Peer",true,true):"");
 }
 
 function mCard(id,name,mic,cam){
-  const init=name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  const ini=name.trim().split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?";
   return`<div class="mcard">
-    <div class="mavatar">${init}</div>
+    <div class="mavatar">${ini}</div>
     <div class="minfo"><div class="mname">${esc(name)}</div><div class="mid">${id.slice(0,22)}</div></div>
     <div class="micons">
       <div class="mi${mic?"":" off"}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div>
@@ -1265,10 +1199,212 @@ function mCard(id,name,mic,cam){
   </div>`;
 }
 
-// ═══ SESSION SETTINGS ════════════════════════════════════════════
-function applyName(){
-  const n=G("sname-in").value.trim();if(n){G("sname-display").textContent=n;}st("Session name updated.");
+// ═══════════════════════════════════════════════════════════════
+//  AI — TRANSCRIPT (Web Speech API)
+// ═══════════════════════════════════════════════════════════════
+function toggleTranscript(){
+  if(txActive){stopTranscript();}else{startTranscript();}
 }
+
+function startTranscript(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){st("Transcription not supported — use Chrome.");return;}
+  recognition=new SR();
+  recognition.continuous=true;
+  recognition.interimResults=true;
+  recognition.lang="en-US";
+  G("ai-empty").style.display="none";
+  // Add interim line placeholder
+  txInterimEl=document.createElement("div");
+  txInterimEl.className="tx-line";
+  txInterimEl.innerHTML=`<div class="tx-spk">${(myName||"You").split(" ")[0]}</div><div class="tx-text tx-interim" id="tx-interim-text">…</div>`;
+  G("tx-wrap").appendChild(txInterimEl);
+  recognition.onresult=e=>{
+    let interim="", final="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal){final+=e.results[i][0].transcript;}
+      else{interim+=e.results[i][0].transcript;}
+    }
+    if(final){
+      const entry={speaker:myName||"You",text:final.trim(),ts:Date.now()};
+      transcript.push(entry);
+      // Add permanent line before interim placeholder
+      const line=document.createElement("div");
+      line.className="tx-line";
+      const t=new Date(entry.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+      line.innerHTML=`<div class="tx-spk">${esc(entry.speaker.split(" ")[0])}</div><div class="tx-text">${esc(entry.text)}</div><div class="tx-time">${t}</div>`;
+      G("tx-wrap").insertBefore(line,txInterimEl);
+    }
+    if(txInterimEl)G("tx-interim-text").textContent=interim||"…";
+    G("tx-wrap").scrollTop=G("tx-wrap").scrollHeight;
+  };
+  recognition.onerror=e=>{
+    if(e.error!=="no-speech")st("Transcript error: "+e.error);
+  };
+  recognition.onend=()=>{
+    // Auto-restart if still active (handles browser timeouts)
+    if(txActive)recognition.start();
+  };
+  recognition.start();
+  txActive=true;
+  G("btn-rec").textContent="⏹ Stop Transcript";
+  G("btn-rec").classList.add("rec");
+  G("btn-ai").classList.add("recording");
+  st("Transcription active — recording your voice.");
+}
+
+function stopTranscript(){
+  if(recognition){recognition.stop();recognition=null;}
+  txActive=false;
+  if(txInterimEl){txInterimEl.remove();txInterimEl=null;}
+  G("btn-rec").textContent="🎙 Start Transcript";
+  G("btn-rec").classList.remove("rec");
+  G("btn-ai").classList.remove("recording");
+  st("Transcription stopped. "+transcript.length+" lines captured.");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AI — COACHING FORM GENERATION (Claude API)
+// ═══════════════════════════════════════════════════════════════
+async function generateForm(){
+  const apiKey=localStorage.getItem("so_api_key")||G("api-key-in").value.trim();
+  if(!apiKey){
+    st("Add your Anthropic API key in Settings → Claude AI Key first.");
+    OV("settings-ov");return;
+  }
+  if(transcript.length===0){
+    st("No transcript yet — start transcription first.");return;
+  }
+  const txText=transcript.map(t=>`${t.speaker}: ${t.text}`).join("\n");
+  const sessionDate=new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+  G("form-body").innerHTML=`<div style="text-align:center;color:var(--t3);padding:20px;font-size:13px">✨ Generating form from transcript…</div>`;
+  OV("form-ov");
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key":apiKey,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:1000,
+        messages:[{role:"user",content:`You are a professional coaching assistant. Based on this session transcript, generate a structured coaching form.
+
+TRANSCRIPT:
+${txText}
+
+Return ONLY valid JSON with these exact fields (no markdown, no explanation):
+{
+  "clientName": "detected client name or empty string",
+  "coachName": "${myName||"Coach"}",
+  "sessionDate": "${sessionDate}",
+  "sessionGoals": "2-3 sentence summary of goals discussed",
+  "keyObservations": "coach observations about the client",
+  "strengthsIdentified": "strengths observed during session",
+  "areasForGrowth": "areas the client should work on",
+  "actionItems": "specific action items discussed (bullet list as text)",
+  "followUpPlan": "next steps and follow-up schedule",
+  "additionalNotes": "any other relevant notes"
+}`}]
+      })
+    });
+    const data=await res.json();
+    const text=data.content?.[0]?.text||"{}";
+    const clean=text.replace(/```json|```/g,"").trim();
+    coachingForm=JSON.parse(clean);
+    renderForm(coachingForm);
+    st("Coaching form generated.");
+  }catch(e){
+    console.error(e);
+    G("form-body").innerHTML=`<div style="color:var(--red);font-size:13px;padding:12px">Error generating form: ${esc(e.message)}<br><br><span style="color:var(--t3);font-size:11px">Check your API key in Settings or try again.</span></div>`;
+  }
+}
+
+function renderForm(f){
+  const fields=[
+    ["Client Name","clientName"],["Coach Name","coachName"],
+    ["Session Date","sessionDate"],["Session Goals","sessionGoals"],
+    ["Key Observations","keyObservations"],["Strengths Identified","strengthsIdentified"],
+    ["Areas for Growth","areasForGrowth"],["Action Items","actionItems"],
+    ["Follow-Up Plan","followUpPlan"],["Additional Notes","additionalNotes"]
+  ];
+  G("form-body").innerHTML=fields.map(([label,key])=>`
+    <div class="form-field">
+      <div class="ff-label">${label}</div>
+      <textarea class="ff-value" id="ff-${key}" rows="${key.includes("Notes")||key==="actionItems"?4:2}">${esc(f[key]||"")}</textarea>
+    </div>`).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PDF EXPORT
+// ═══════════════════════════════════════════════════════════════
+function exportPDF(){
+  if(!coachingForm){st("Generate the coaching form first.");return;}
+  // Read any edits the user made in the form
+  const fields=["clientName","coachName","sessionDate","sessionGoals","keyObservations",
+    "strengthsIdentified","areasForGrowth","actionItems","followUpPlan","additionalNotes"];
+  const data={};
+  fields.forEach(k=>{
+    const el=G("ff-"+k);
+    data[k]=el?el.value:coachingForm[k]||"";
+  });
+  if(!window.jspdf){st("PDF library loading, try again in a moment.");return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  const W=210, M=20, CW=W-M*2;
+  let y=M;
+  // Header
+  doc.setFillColor(8,12,26);doc.rect(0,0,W,28,"F");
+  doc.setTextColor(45,212,191);doc.setFontSize(20);doc.setFont("helvetica","bold");
+  doc.text("STRIVE-OPS",M,14);
+  doc.setTextColor(140,148,184);doc.setFontSize(10);doc.setFont("helvetica","normal");
+  doc.text("Live Coaching Session Report",M,20);
+  doc.setTextColor(61,78,114);doc.text(data.sessionDate||new Date().toLocaleDateString(),W-M,20,{align:"right"});
+  y=36;
+  // Client info bar
+  doc.setFillColor(13,17,34);doc.rect(M,y,CW,12,"F");
+  doc.setTextColor(221,230,255);doc.setFontSize(11);doc.setFont("helvetica","bold");
+  doc.text("Client: "+(data.clientName||"—")+"   |   Coach: "+(data.coachName||"—"),M+4,y+8);
+  y+=20;
+  // Content sections
+  const sections=[
+    ["Session Goals",data.sessionGoals],["Key Observations",data.keyObservations],
+    ["Strengths Identified",data.strengthsIdentified],["Areas for Growth",data.areasForGrowth],
+    ["Action Items",data.actionItems],["Follow-Up Plan",data.followUpPlan],
+    ["Additional Notes",data.additionalNotes]
+  ];
+  doc.setTextColor(45,212,191);doc.setFontSize(9);
+  sections.forEach(([label,val])=>{
+    if(!val)return;
+    if(y>265){doc.addPage();y=M;}
+    doc.setFont("helvetica","bold");doc.setTextColor(45,212,191);
+    doc.text(label.toUpperCase(),M,y);y+=5;
+    doc.setFont("helvetica","normal");doc.setTextColor(60,70,100);
+    const lines=doc.splitTextToSize(val||"—",CW);
+    lines.forEach(line=>{
+      if(y>270){doc.addPage();y=M;}
+      doc.text(line,M,y);y+=5;
+    });
+    y+=5;
+  });
+  // Footer
+  const pages=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);doc.setFontSize(8);doc.setTextColor(61,78,114);
+    doc.text("Strive-Ops · Live Coaching Platform · Confidential",M,290);
+    doc.text("Page "+i+" of "+pages,W-M,290,{align:"right"});
+  }
+  doc.save(`coaching-${(data.clientName||"session").replace(/\s+/g,"-").toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`);
+  st("PDF exported.");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SESSION SETTINGS
+// ═══════════════════════════════════════════════════════════════
+function applyName(){const n=G("sname-in").value.trim();if(n)G("sname-el").textContent=n;st("Name updated.");}
 function applyPin(){
   const p=G("pin-in").value.trim();if(!/^\d{4,6}$/.test(p)){st("PIN must be 4–6 digits.");return;}
   sPin=p;G("pdot").classList.add("on");
@@ -1280,13 +1416,22 @@ function clearPin(){
   G("pstatus").textContent="No PIN — anyone with your link can join";
   G("pin-in").value="";G("pin-badge").classList.add("hidden");st("PIN cleared.");
 }
+function saveApiKey(){
+  const key=G("api-key-in").value.trim();
+  if(!key){st("Enter your API key first.");return;}
+  localStorage.setItem("so_api_key",key);
+  st("API key saved to this browser.");
+}
 
-// ═══ UTILS ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════
 async function cpEl(id){
   const t=G(id).textContent;
   try{await navigator.clipboard.writeText(t);st("Copied.");}
   catch{prompt("Copy:",t);}
 }
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function stopTracks(){if(localStream)localStream.getTracks().forEach(t=>t.stop());}
 </script>
 </body>
