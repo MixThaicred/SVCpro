@@ -1,15 +1,27 @@
 let peer = null;
-let localStream = null;
+let localStream = null;          // raw mic/camera from getUserMedia
+let outboundStream = null;       // processed outgoing stream
 let currentCall = null;
 let pendingIncomingCall = null;
 let pendingRemoteStream = null;
 let currentAudioProfile = "standard";
+let currentVideoEffect = "none";
+let customBackgroundImage = null;
+
+let selfieSegmentation = null;
+let processingActive = false;
+let processingCanvasStream = null;
 
 const myIdEl = document.getElementById("my-id");
 const remoteIdInput = document.getElementById("remote-id-input");
 const statusEl = document.getElementById("status");
 
-const localVideo = document.getElementById("local-video");
+const localCanvas = document.getElementById("local-canvas");
+const localCtx = localCanvas.getContext("2d");
+const rawVideo = document.getElementById("raw-video");
+const bgCanvas = document.getElementById("bg-canvas");
+const bgCtx = bgCanvas.getContext("2d");
+
 const remoteVideo = document.getElementById("remote-video");
 
 const localPlaceholder = document.getElementById("local-placeholder");
@@ -36,13 +48,19 @@ const applySpeakerBtn = document.getElementById("apply-speaker-btn");
 const audioProfileSelect = document.getElementById("audio-profile-select");
 const applyAudioProfileBtn = document.getElementById("apply-audio-profile-btn");
 
+const effectSelect = document.getElementById("effect-select");
+const applyEffectBtn = document.getElementById("apply-effect-btn");
+const uploadBgBtn = document.getElementById("upload-bg-btn");
+const bgUploadInput = document.getElementById("bg-upload-input");
+
 const muteMicBtn = document.getElementById("mute-mic-btn");
 const muteRemoteBtn = document.getElementById("mute-remote-btn");
 
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
   bindEvents();
   createPeer();
   preloadJoinId();
+  initSegmentation();
   setStatus("Page loaded. Waiting for peer connection...");
 });
 
@@ -60,6 +78,10 @@ function bindEvents() {
   applySpeakerBtn.addEventListener("click", applySelectedSpeaker);
   applyAudioProfileBtn.addEventListener("click", applyAudioProfile);
 
+  applyEffectBtn.addEventListener("click", applyVideoEffect);
+  uploadBgBtn.addEventListener("click", () => bgUploadInput.click());
+  bgUploadInput.addEventListener("change", handleBackgroundUpload);
+
   muteMicBtn.addEventListener("click", toggleMicMute);
   muteRemoteBtn.addEventListener("click", toggleRemoteMute);
 }
@@ -68,8 +90,8 @@ function setStatus(message) {
   statusEl.textContent = message;
 }
 
-function showLocalVideo(show) {
-  localVideo.style.display = show ? "block" : "none";
+function showLocalPreview(show) {
+  localCanvas.style.display = show ? "block" : "none";
   localPlaceholder.style.display = show ? "none" : "flex";
 }
 
@@ -130,7 +152,6 @@ function createPeer() {
   });
 
   peer.on("call", (incomingCall) => {
-    console.log("Incoming connection request from:", incomingCall.peer);
     pendingIncomingCall = incomingCall;
     callerIdEl.textContent = incomingCall.peer;
     showIncomingModal(true);
@@ -141,6 +162,18 @@ function createPeer() {
     console.error("Peer error:", err);
     setStatus("Peer error: " + (err.type || "unknown"));
   });
+}
+
+function initSegmentation() {
+  selfieSegmentation = new SelfieSegmentation({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+  });
+
+  selfieSegmentation.setOptions({
+    modelSelection: 1
+  });
+
+  selfieSegmentation.onResults(onSegmentationResults);
 }
 
 async function startCamera() {
@@ -160,20 +193,157 @@ async function startCamera() {
 }
 
 async function startMediaWithConstraints(constraints) {
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
+  stopLocalTracks();
 
   localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
-  localVideo.srcObject = localStream;
-  localVideo.muted = true;
-  localVideo.playsInline = true;
-  await localVideo.play();
+  rawVideo.srcObject = localStream;
+  rawVideo.muted = true;
+  rawVideo.playsInline = true;
+  await rawVideo.play();
 
-  showLocalVideo(true);
+  await setupProcessedPipeline();
+  showLocalPreview(true);
   updateMuteButtons();
+}
+
+async function setupProcessedPipeline() {
+  const settings = localStream.getVideoTracks()[0]?.getSettings();
+  const width = settings?.width || 1280;
+  const height = settings?.height || 720;
+
+  localCanvas.width = width;
+  localCanvas.height = height;
+  bgCanvas.width = width;
+  bgCanvas.height = height;
+
+  if (processingCanvasStream) {
+    processingCanvasStream.getTracks().forEach(track => track.stop());
+    processingCanvasStream = null;
+  }
+
+  processingCanvasStream = localCanvas.captureStream(25);
+  rebuildOutboundStream();
+
+  if (!processingActive) {
+    processingActive = true;
+    processFrameLoop();
+  }
+}
+
+function rebuildOutboundStream() {
+  if (!processingCanvasStream) return;
+
+  const canvasVideoTrack = processingCanvasStream.getVideoTracks()[0];
+  const audioTrack = localStream?.getAudioTracks()[0] || null;
+
+  if (outboundStream) {
+    outboundStream.getTracks().forEach(track => track.stop());
+  }
+
+  outboundStream = new MediaStream();
+
+  if (canvasVideoTrack) outboundStream.addTrack(canvasVideoTrack);
+  if (audioTrack) outboundStream.addTrack(audioTrack);
+
+  replaceActiveSenders();
+}
+
+async function replaceActiveSenders() {
+  if (!currentCall || !currentCall.peerConnection || !outboundStream) return;
+
+  const senders = currentCall.peerConnection.getSenders();
+  const newVideoTrack = outboundStream.getVideoTracks()[0];
+  const newAudioTrack = outboundStream.getAudioTracks()[0];
+
+  const videoSender = senders.find(sender => sender.track && sender.track.kind === "video");
+  const audioSender = senders.find(sender => sender.track && sender.track.kind === "audio");
+
+  try {
+    if (videoSender && newVideoTrack) {
+      await videoSender.replaceTrack(newVideoTrack);
+    }
+    if (audioSender && newAudioTrack) {
+      await audioSender.replaceTrack(newAudioTrack);
+    }
+  } catch (err) {
+    console.error("replaceActiveSenders error:", err);
+  }
+}
+
+async function processFrameLoop() {
+  if (!processingActive) return;
+
+  if (rawVideo.readyState >= 2 && selfieSegmentation) {
+    try {
+      await selfieSegmentation.send({ image: rawVideo });
+    } catch (err) {
+      console.error("Segmentation send error:", err);
+    }
+  }
+
+  requestAnimationFrame(processFrameLoop);
+}
+
+function onSegmentationResults(results) {
+  const width = localCanvas.width;
+  const height = localCanvas.height;
+
+  localCtx.save();
+  localCtx.clearRect(0, 0, width, height);
+
+  if (currentVideoEffect === "none") {
+    localCtx.drawImage(results.image, 0, 0, width, height);
+    localCtx.restore();
+    return;
+  }
+
+  if (currentVideoEffect === "blur") {
+    localCtx.drawImage(results.segmentationMask, 0, 0, width, height);
+    localCtx.globalCompositeOperation = "source-out";
+    localCtx.filter = "blur(14px)";
+    localCtx.drawImage(results.image, 0, 0, width, height);
+    localCtx.globalCompositeOperation = "destination-atop";
+    localCtx.filter = "none";
+    localCtx.drawImage(results.image, 0, 0, width, height);
+    localCtx.restore();
+    return;
+  }
+
+  if (currentVideoEffect === "solid") {
+    localCtx.fillStyle = "#0f172a";
+    localCtx.fillRect(0, 0, width, height);
+
+    localCtx.globalCompositeOperation = "destination-out";
+    localCtx.drawImage(results.segmentationMask, 0, 0, width, height);
+
+    localCtx.globalCompositeOperation = "destination-over";
+    localCtx.drawImage(results.image, 0, 0, width, height);
+
+    localCtx.restore();
+    return;
+  }
+
+  if (currentVideoEffect === "image") {
+    if (customBackgroundImage) {
+      localCtx.drawImage(customBackgroundImage, 0, 0, width, height);
+    } else {
+      localCtx.fillStyle = "#1e3a8a";
+      localCtx.fillRect(0, 0, width, height);
+    }
+
+    localCtx.globalCompositeOperation = "destination-out";
+    localCtx.drawImage(results.segmentationMask, 0, 0, width, height);
+
+    localCtx.globalCompositeOperation = "destination-over";
+    localCtx.drawImage(results.image, 0, 0, width, height);
+
+    localCtx.restore();
+    return;
+  }
+
+  localCtx.drawImage(results.image, 0, 0, width, height);
+  localCtx.restore();
 }
 
 async function loadDevices() {
@@ -235,16 +405,12 @@ async function loadDevices() {
 
     if (currentVideoTrack) {
       const settings = currentVideoTrack.getSettings();
-      if (settings.deviceId) {
-        cameraSelect.value = settings.deviceId;
-      }
+      if (settings.deviceId) cameraSelect.value = settings.deviceId;
     }
 
     if (currentAudioTrack) {
       const settings = currentAudioTrack.getSettings();
-      if (settings.deviceId) {
-        micSelect.value = settings.deviceId;
-      }
+      if (settings.deviceId) micSelect.value = settings.deviceId;
     }
   }
 
@@ -257,41 +423,22 @@ async function applySelectedDevices() {
     const selectedMicId = micSelect.value;
 
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video: selectedCameraId
-        ? { deviceId: { exact: selectedCameraId } }
-        : true,
+      video: selectedCameraId ? { deviceId: { exact: selectedCameraId } } : true,
       audio: getAudioConstraints(currentAudioProfile, selectedMicId || null)
     });
 
-    const newVideoTrack = newStream.getVideoTracks()[0];
-    const newAudioTrack = newStream.getAudioTracks()[0];
-
-    if (currentCall && currentCall.peerConnection) {
-      const senders = currentCall.peerConnection.getSenders();
-
-      const videoSender = senders.find(sender => sender.track && sender.track.kind === "video");
-      const audioSender = senders.find(sender => sender.track && sender.track.kind === "audio");
-
-      if (videoSender && newVideoTrack) {
-        await videoSender.replaceTrack(newVideoTrack);
-      }
-
-      if (audioSender && newAudioTrack) {
-        await audioSender.replaceTrack(newAudioTrack);
-      }
-    }
-
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
+    stopLocalTracks();
 
     localStream = newStream;
-    localVideo.srcObject = localStream;
-    localVideo.muted = true;
-    await localVideo.play();
+    rawVideo.srcObject = localStream;
+    rawVideo.muted = true;
+    rawVideo.playsInline = true;
+    await rawVideo.play();
 
-    showLocalVideo(true);
+    await setupProcessedPipeline();
+    showLocalPreview(true);
     updateMuteButtons();
+
     setStatus("Camera and microphone updated.");
   } catch (err) {
     console.error("Apply devices error:", err);
@@ -319,8 +466,7 @@ async function applySelectedSpeaker() {
 
 async function applyAudioProfile() {
   try {
-    const selectedProfile = audioProfileSelect.value;
-    currentAudioProfile = selectedProfile;
+    currentAudioProfile = audioProfileSelect.value;
 
     if (!localStream) {
       setStatus("Audio profile saved. Start camera to apply it.");
@@ -331,40 +477,20 @@ async function applyAudioProfile() {
     const selectedMicId = micSelect.value;
 
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video: selectedCameraId
-        ? { deviceId: { exact: selectedCameraId } }
-        : true,
+      video: selectedCameraId ? { deviceId: { exact: selectedCameraId } } : true,
       audio: getAudioConstraints(currentAudioProfile, selectedMicId || null)
     });
 
-    const newVideoTrack = newStream.getVideoTracks()[0];
-    const newAudioTrack = newStream.getAudioTracks()[0];
-
-    if (currentCall && currentCall.peerConnection) {
-      const senders = currentCall.peerConnection.getSenders();
-
-      const videoSender = senders.find(sender => sender.track && sender.track.kind === "video");
-      const audioSender = senders.find(sender => sender.track && sender.track.kind === "audio");
-
-      if (videoSender && newVideoTrack) {
-        await videoSender.replaceTrack(newVideoTrack);
-      }
-
-      if (audioSender && newAudioTrack) {
-        await audioSender.replaceTrack(newAudioTrack);
-      }
-    }
-
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
+    stopLocalTracks();
 
     localStream = newStream;
-    localVideo.srcObject = localStream;
-    localVideo.muted = true;
-    await localVideo.play();
+    rawVideo.srcObject = localStream;
+    rawVideo.muted = true;
+    rawVideo.playsInline = true;
+    await rawVideo.play();
 
-    showLocalVideo(true);
+    await setupProcessedPipeline();
+    showLocalPreview(true);
     updateMuteButtons();
     await loadDevices();
 
@@ -373,6 +499,35 @@ async function applyAudioProfile() {
     console.error("Audio profile error:", err);
     setStatus("Could not apply audio profile.");
   }
+}
+
+function applyVideoEffect() {
+  currentVideoEffect = effectSelect.value;
+
+  if (currentVideoEffect === "image" && !customBackgroundImage) {
+    setStatus("Custom background selected. Upload an image to use it.");
+    return;
+  }
+
+  setStatus("Video effect updated.");
+}
+
+function handleBackgroundUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    customBackgroundImage = img;
+    currentVideoEffect = "image";
+    effectSelect.value = "image";
+    setStatus("Custom background loaded.");
+    URL.revokeObjectURL(url);
+  };
+
+  img.src = url;
 }
 
 function startConnectionRequest() {
@@ -396,8 +551,8 @@ function startConnectionRequest() {
   setStatus("Sending connection request to " + remoteId + "...");
 
   try {
-    if (localStream) {
-      currentCall = peer.call(remoteId, localStream, {
+    if (outboundStream) {
+      currentCall = peer.call(remoteId, outboundStream, {
         metadata: { wantsConnection: true }
       });
     } else {
@@ -423,15 +578,14 @@ function acceptIncomingCall() {
 
   currentCall = pendingIncomingCall;
   pendingIncomingCall = null;
-
   showIncomingModal(false);
 
-  if (localStream) {
-    currentCall.answer(localStream);
-    setStatus("Connection accepted with local camera.");
+  if (outboundStream) {
+    currentCall.answer(outboundStream);
+    setStatus("Connection accepted with local media.");
   } else {
     currentCall.answer();
-    setStatus("Connection accepted without local camera.");
+    setStatus("Connection accepted without local media.");
   }
 
   attachCallEvents(currentCall);
@@ -451,7 +605,6 @@ function attachCallEvents(call) {
   if (!call) return;
 
   call.on("stream", (remoteStream) => {
-    console.log("Remote stream received");
     pendingRemoteStream = remoteStream;
     attachRemoteStream(remoteStream);
   });
@@ -554,12 +707,10 @@ function toggleMicMute() {
 
 function updateMuteButtons() {
   const audioTrack = localStream ? localStream.getAudioTracks()[0] : null;
-
   if (!audioTrack) {
     muteMicBtn.textContent = "Mute Mic";
     return;
   }
-
   muteMicBtn.textContent = audioTrack.enabled ? "Mute Mic" : "Unmute Mic";
 }
 
@@ -571,6 +722,12 @@ function toggleRemoteMute() {
 
 function updateRemoteMuteButton() {
   muteRemoteBtn.textContent = remoteVideo.muted ? "Unmute Remote Audio" : "Mute Remote Audio";
+}
+
+function stopLocalTracks() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+  }
 }
 
 async function copyMyId() {
