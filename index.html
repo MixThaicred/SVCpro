@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Strive-Ops | Milestone A</title>
+  <title>Strive-Ops | Milestone B</title>
+
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+
   <style>
     * {
       box-sizing: border-box;
@@ -19,7 +22,7 @@
     }
 
     .app {
-      max-width: 1100px;
+      max-width: 1180px;
       margin: 0 auto;
     }
 
@@ -93,6 +96,7 @@
     .btn-blue { background: #2563eb; }
     .btn-red { background: #dc2626; }
     .btn-gray { background: #334155; }
+    .btn-purple { background: #7c3aed; }
 
     .status {
       font-size: 14px;
@@ -121,7 +125,8 @@
       margin-bottom: 8px;
     }
 
-    video {
+    video,
+    canvas {
       width: 100%;
       min-height: 280px;
       background: black;
@@ -129,9 +134,9 @@
       object-fit: cover;
     }
 
-    #local-video {
-      transform: scaleX(-1);
+    #local-canvas {
       display: none;
+      transform: scaleX(-1);
     }
 
     #remote-video {
@@ -198,6 +203,10 @@
       flex-wrap: wrap;
     }
 
+    .hidden-media {
+      display: none !important;
+    }
+
     @media (max-width: 800px) {
       .videos {
         grid-template-columns: 1fr;
@@ -209,7 +218,7 @@
   <div class="app">
     <div class="header">
       <div class="title">Strive-Ops</div>
-      <div class="subtitle">Milestone A — Routing and audio controls</div>
+      <div class="subtitle">Milestone B — Camera effects and advanced media controls</div>
     </div>
 
     <div class="card">
@@ -257,6 +266,20 @@
 
     <div class="card">
       <div class="controls">
+        <select id="effect-select">
+          <option value="none">Video Effect: None</option>
+          <option value="blur">Video Effect: Blur Background</option>
+          <option value="solid">Video Effect: Remove Background</option>
+          <option value="image">Video Effect: Custom Background</option>
+        </select>
+        <button id="apply-effect-btn" class="btn-purple">Apply Effect</button>
+        <button id="upload-bg-btn" class="btn-gray">Upload Background</button>
+        <input id="bg-upload-input" type="file" accept="image/*" class="hidden-media" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="controls">
         <button id="mute-mic-btn" class="btn-gray">Mute Mic</button>
         <button id="mute-remote-btn" class="btn-gray">Mute Remote Audio</button>
       </div>
@@ -269,8 +292,8 @@
     <div class="videos">
       <div class="video-card">
         <div class="video-title">Local Preview</div>
-        <video id="local-video" autoplay muted playsinline></video>
-        <div id="local-placeholder" class="placeholder">Your local camera preview will appear here.</div>
+        <canvas id="local-canvas"></canvas>
+        <div id="local-placeholder" class="placeholder">Your local processed preview will appear here.</div>
       </div>
 
       <div class="video-card">
@@ -293,6 +316,10 @@
     </div>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <!-- hidden processing elements -->
+  <video id="raw-video" autoplay muted playsinline class="hidden-media"></video>
+  <canvas id="bg-canvas" class="hidden-media"></canvas>
+
+  <script src="app.js?v=6"></script>
 </body>
 </html>
