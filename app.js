@@ -25,11 +25,18 @@ const callerIdEl = document.getElementById("caller-id");
 const acceptCallBtn = document.getElementById("accept-call-btn");
 const declineCallBtn = document.getElementById("decline-call-btn");
 
+const cameraSelect = document.getElementById("camera-select");
+const micSelect = document.getElementById("mic-select");
+const applyDevicesBtn = document.getElementById("apply-devices-btn");
+
+const muteMicBtn = document.getElementById("mute-mic-btn");
+const muteRemoteBtn = document.getElementById("mute-remote-btn");
+
 window.addEventListener("load", () => {
   bindEvents();
   createPeer();
   preloadJoinId();
-  debugStatus("Page loaded. Waiting for peer connection...");
+  setStatus("Page loaded. Waiting for peer connection...");
 });
 
 function bindEvents() {
@@ -38,16 +45,17 @@ function bindEvents() {
   connectBtn.addEventListener("click", startConnectionRequest);
   hangupBtn.addEventListener("click", hangUp);
   tapPlayBtn.addEventListener("click", forcePlayRemote);
+
   acceptCallBtn.addEventListener("click", acceptIncomingCall);
   declineCallBtn.addEventListener("click", declineIncomingCall);
+
+  applyDevicesBtn.addEventListener("click", applySelectedDevices);
+
+  muteMicBtn.addEventListener("click", toggleMicMute);
+  muteRemoteBtn.addEventListener("click", toggleRemoteMute);
 }
 
 function setStatus(message) {
-  statusEl.textContent = message;
-}
-
-function debugStatus(message) {
-  console.log(message);
   statusEl.textContent = message;
 }
 
@@ -80,7 +88,7 @@ function createPeer() {
 
   peer.on("open", (idValue) => {
     myIdEl.textContent = idValue;
-    debugStatus("Peer ready. ID assigned: " + idValue);
+    setStatus("Peer ready. ID assigned: " + idValue);
   });
 
   peer.on("call", (incomingCall) => {
@@ -88,39 +96,166 @@ function createPeer() {
     pendingIncomingCall = incomingCall;
     callerIdEl.textContent = incomingCall.peer;
     showIncomingModal(true);
-    debugStatus("Incoming request received from " + incomingCall.peer);
+    setStatus("Incoming request received from " + incomingCall.peer);
   });
 
   peer.on("error", (err) => {
     console.error("Peer error:", err);
-    debugStatus("Peer error: " + (err.type || "unknown"));
+    setStatus("Peer error: " + (err.type || "unknown"));
   });
 }
 
 async function startCamera() {
   try {
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      localStream = null;
-    }
-
-    localStream = await navigator.mediaDevices.getUserMedia({
+    await startMediaWithConstraints({
       video: true,
-      audio: true
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
     });
 
+    await loadDevices();
+    setStatus("Camera started successfully.");
+  } catch (err) {
+    console.error("Camera error:", err);
+    setStatus("Could not start camera.");
+    alert("Could not access camera and microphone.");
+  }
+}
+
+async function startMediaWithConstraints(constraints) {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+
+  localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+  localVideo.srcObject = localStream;
+  localVideo.muted = true;
+  localVideo.playsInline = true;
+  await localVideo.play();
+
+  showLocalVideo(true);
+  updateMuteButtons();
+}
+
+async function loadDevices() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+
+  const cameras = devices.filter(d => d.kind === "videoinput");
+  const mics = devices.filter(d => d.kind === "audioinput");
+
+  cameraSelect.innerHTML = "";
+  micSelect.innerHTML = "";
+
+  if (!cameras.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No Camera Found";
+    cameraSelect.appendChild(opt);
+  } else {
+    cameras.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `Camera ${index + 1}`;
+      cameraSelect.appendChild(option);
+    });
+  }
+
+  if (!mics.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No Microphone Found";
+    micSelect.appendChild(opt);
+  } else {
+    mics.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `Microphone ${index + 1}`;
+      micSelect.appendChild(option);
+    });
+  }
+
+  if (localStream) {
+    const currentVideoTrack = localStream.getVideoTracks()[0];
+    const currentAudioTrack = localStream.getAudioTracks()[0];
+
+    if (currentVideoTrack) {
+      const settings = currentVideoTrack.getSettings();
+      if (settings.deviceId) {
+        cameraSelect.value = settings.deviceId;
+      }
+    }
+
+    if (currentAudioTrack) {
+      const settings = currentAudioTrack.getSettings();
+      if (settings.deviceId) {
+        micSelect.value = settings.deviceId;
+      }
+    }
+  }
+}
+
+async function applySelectedDevices() {
+  try {
+    const selectedCameraId = cameraSelect.value;
+    const selectedMicId = micSelect.value;
+
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: selectedCameraId
+        ? { deviceId: { exact: selectedCameraId } }
+        : true,
+      audio: selectedMicId
+        ? {
+            deviceId: { exact: selectedMicId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+    });
+
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    const newAudioTrack = newStream.getAudioTracks()[0];
+
+    if (currentCall && currentCall.peerConnection) {
+      const senders = currentCall.peerConnection.getSenders();
+
+      const videoSender = senders.find(sender => sender.track && sender.track.kind === "video");
+      const audioSender = senders.find(sender => sender.track && sender.track.kind === "audio");
+
+      if (videoSender && newVideoTrack) {
+        await videoSender.replaceTrack(newVideoTrack);
+      }
+
+      if (audioSender && newAudioTrack) {
+        await audioSender.replaceTrack(newAudioTrack);
+      }
+    }
+
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+
+    localStream = newStream;
     localVideo.srcObject = localStream;
     localVideo.muted = true;
-    localVideo.playsInline = true;
-
     await localVideo.play();
 
     showLocalVideo(true);
-    debugStatus("Camera started successfully.");
+    updateMuteButtons();
+    setStatus("Camera and microphone updated.");
   } catch (err) {
-    console.error("Camera error:", err);
-    debugStatus("Could not start camera.");
-    alert("Could not access camera and microphone.");
+    console.error("Apply devices error:", err);
+    setStatus("Could not switch devices.");
+    alert("Could not switch camera/microphone.");
   }
 }
 
@@ -142,7 +277,7 @@ function startConnectionRequest() {
     currentCall = null;
   }
 
-  debugStatus("Sending connection request to " + remoteId + "...");
+  setStatus("Sending connection request to " + remoteId + "...");
 
   try {
     if (localStream) {
@@ -158,7 +293,7 @@ function startConnectionRequest() {
     attachCallEvents(currentCall);
   } catch (err) {
     console.error("Connection request error:", err);
-    debugStatus("Failed to send connection request.");
+    setStatus("Failed to send connection request.");
   }
 }
 
@@ -177,10 +312,10 @@ function acceptIncomingCall() {
 
   if (localStream) {
     currentCall.answer(localStream);
-    debugStatus("Connection accepted with local camera.");
+    setStatus("Connection accepted with local camera.");
   } else {
     currentCall.answer();
-    debugStatus("Connection accepted without local camera.");
+    setStatus("Connection accepted without local camera.");
   }
 
   attachCallEvents(currentCall);
@@ -193,7 +328,7 @@ function declineIncomingCall() {
   }
 
   showIncomingModal(false);
-  debugStatus("Connection request declined.");
+  setStatus("Connection request declined.");
 }
 
 function attachCallEvents(call) {
@@ -206,24 +341,25 @@ function attachCallEvents(call) {
   });
 
   call.on("close", () => {
-    console.log("Call closed");
     clearRemote();
     showIncomingModal(false);
     pendingIncomingCall = null;
-    debugStatus("Connection ended.");
+    setStatus("Connection ended.");
   });
 
   call.on("error", (err) => {
     console.error("Call error:", err);
-    debugStatus("Call error.");
+    setStatus("Call error.");
   });
 }
 
 function attachRemoteStream(stream) {
   remoteVideo.srcObject = stream;
   remoteVideo.playsInline = true;
+  remoteVideo.muted = false;
 
   showRemoteVideo(true);
+  updateRemoteMuteButton();
 
   const playPromise = remoteVideo.play();
 
@@ -231,15 +367,15 @@ function attachRemoteStream(stream) {
     playPromise
       .then(() => {
         showTapPlay(false);
-        debugStatus("Remote video connected.");
+        setStatus("Remote video connected.");
       })
       .catch((err) => {
         console.error("Autoplay blocked:", err);
         showTapPlay(true);
-        debugStatus("Remote stream received. Tap the button to start playback.");
+        setStatus("Remote stream received. Tap the button to start playback.");
       });
   } else {
-    debugStatus("Remote video connected.");
+    setStatus("Remote video connected.");
   }
 }
 
@@ -251,11 +387,11 @@ function forcePlayRemote() {
   remoteVideo.play()
     .then(() => {
       showTapPlay(false);
-      debugStatus("Remote video connected.");
+      setStatus("Remote video connected.");
     })
     .catch((err) => {
       console.error("Manual remote playback failed:", err);
-      debugStatus("Tap again to start remote playback.");
+      setStatus("Tap again to start remote playback.");
     });
 }
 
@@ -264,6 +400,7 @@ function clearRemote() {
   pendingRemoteStream = null;
   showRemoteVideo(false);
   showTapPlay(false);
+  updateRemoteMuteButton();
 }
 
 function hangUp() {
@@ -279,7 +416,45 @@ function hangUp() {
 
   showIncomingModal(false);
   clearRemote();
-  debugStatus("Ready.");
+  setStatus("Ready.");
+}
+
+function toggleMicMute() {
+  if (!localStream) {
+    setStatus("Start your camera first.");
+    return;
+  }
+
+  const audioTrack = localStream.getAudioTracks()[0];
+  if (!audioTrack) {
+    setStatus("No microphone track available.");
+    return;
+  }
+
+  audioTrack.enabled = !audioTrack.enabled;
+  updateMuteButtons();
+  setStatus(audioTrack.enabled ? "Microphone unmuted." : "Microphone muted.");
+}
+
+function updateMuteButtons() {
+  const audioTrack = localStream ? localStream.getAudioTracks()[0] : null;
+
+  if (!audioTrack) {
+    muteMicBtn.textContent = "Mute Mic";
+    return;
+  }
+
+  muteMicBtn.textContent = audioTrack.enabled ? "Mute Mic" : "Unmute Mic";
+}
+
+function toggleRemoteMute() {
+  remoteVideo.muted = !remoteVideo.muted;
+  updateRemoteMuteButton();
+  setStatus(remoteVideo.muted ? "Remote audio muted." : "Remote audio unmuted.");
+}
+
+function updateRemoteMuteButton() {
+  muteRemoteBtn.textContent = remoteVideo.muted ? "Unmute Remote Audio" : "Mute Remote Audio";
 }
 
 async function copyMyId() {
@@ -289,7 +464,7 @@ async function copyMyId() {
 
   try {
     await navigator.clipboard.writeText(myId);
-    debugStatus("Your ID was copied.");
+    setStatus("Your ID was copied.");
   } catch (err) {
     console.error("Clipboard error:", err);
     prompt("Copy this ID:", myId);
