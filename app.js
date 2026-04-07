@@ -2,6 +2,7 @@ let peer;
 let localStream = null;
 let currentCall = null;
 let viewerMode = false;
+let pendingRemoteStream = null;
 
 window.onload = () => {
   initPeer();
@@ -15,6 +16,7 @@ function bindUi() {
   document.getElementById("connect-btn").addEventListener("click", startCall);
   document.getElementById("hangup-btn").addEventListener("click", hangUp);
   document.getElementById("copy-link-btn").addEventListener("click", copyInviteLink);
+  document.getElementById("tap-play-remote").addEventListener("click", forcePlayRemote);
 }
 
 function setStatus(message) {
@@ -29,6 +31,10 @@ function showLocalVideo(show) {
 function showRemoteVideo(show) {
   document.getElementById("remote-video").style.display = show ? "block" : "none";
   document.getElementById("remote-placeholder").style.display = show ? "none" : "flex";
+}
+
+function showTapPlay(show) {
+  document.getElementById("tap-play-remote").style.display = show ? "block" : "none";
 }
 
 async function enableMedia() {
@@ -48,6 +54,8 @@ async function enableMedia() {
 
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = localStream;
+    localVideo.muted = true;
+    localVideo.playsInline = true;
     await localVideo.play();
 
     showLocalVideo(true);
@@ -89,9 +97,6 @@ function initPeer() {
 
     currentCall = call;
 
-    // Key fix:
-    // If local media exists, answer with it.
-    // If not, answer without local stream so this device can still RECEIVE video.
     if (localStream) {
       call.answer(localStream);
       setStatus("Incoming call answered with local camera.");
@@ -124,12 +129,10 @@ function startCall() {
 
   setStatus("Calling...");
 
-  // If media is enabled, send it.
-  // If viewer mode or no media, still place the call without a local stream.
   if (localStream) {
     currentCall = peer.call(remoteId, localStream);
   } else {
-    currentCall = peer.call(remoteId, undefined);
+    currentCall = peer.call(remoteId);
   }
 
   attachCallEvents(currentCall);
@@ -138,18 +141,8 @@ function startCall() {
 function attachCallEvents(call) {
   call.on("stream", (remoteStream) => {
     console.log("Remote stream received");
-
-    const remoteVideo = document.getElementById("remote-video");
-    remoteVideo.srcObject = remoteStream;
-
-    remoteVideo.onloadedmetadata = () => {
-      remoteVideo.play().catch(err => {
-        console.error("Remote play failed:", err);
-      });
-    };
-
-    showRemoteVideo(true);
-    setStatus("Connected.");
+    pendingRemoteStream = remoteStream;
+    attachRemoteStream(remoteStream);
   });
 
   call.on("close", () => {
@@ -164,10 +157,55 @@ function attachCallEvents(call) {
   });
 }
 
+function attachRemoteStream(stream) {
+  const remoteVideo = document.getElementById("remote-video");
+  remoteVideo.srcObject = stream;
+  remoteVideo.playsInline = true;
+
+  showRemoteVideo(true);
+
+  const playAttempt = remoteVideo.play();
+
+  if (playAttempt && typeof playAttempt.then === "function") {
+    playAttempt
+      .then(() => {
+        showTapPlay(false);
+        setStatus("Connected.");
+      })
+      .catch((err) => {
+        console.error("Remote autoplay blocked:", err);
+        showTapPlay(true);
+        setStatus("Remote stream received. Tap button to start video.");
+      });
+  } else {
+    setStatus("Connected.");
+  }
+}
+
+function forcePlayRemote() {
+  const remoteVideo = document.getElementById("remote-video");
+
+  if (pendingRemoteStream && !remoteVideo.srcObject) {
+    remoteVideo.srcObject = pendingRemoteStream;
+  }
+
+  remoteVideo.play()
+    .then(() => {
+      showTapPlay(false);
+      setStatus("Connected.");
+    })
+    .catch((err) => {
+      console.error("Manual remote play failed:", err);
+      setStatus("Tap again to start remote video.");
+    });
+}
+
 function clearRemote() {
   const remoteVideo = document.getElementById("remote-video");
   remoteVideo.srcObject = null;
+  pendingRemoteStream = null;
   showRemoteVideo(false);
+  showTapPlay(false);
 }
 
 function hangUp() {
