@@ -1,55 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Strive-Ops Coaching</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strive-Ops Coaching</title>
 
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
-<style>
-body {
-    background: #020617;
-    color: white;
-    font-family: Arial;
-    text-align: center;
-    padding: 20px;
-}
+  <style>
+    body {
+      background: #020617;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      margin: 0;
+    }
 
-video {
-    width: 45%;
-    background: black;
-    border-radius: 10px;
-    margin: 10px;
-}
+    h2 {
+      margin-top: 0;
+    }
 
-#local-video {
-    transform: scaleX(-1);
-}
-</style>
+    .controls {
+      margin: 20px 0;
+    }
+
+    input {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      margin: 5px;
+      width: 220px;
+      max-width: 90%;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .video-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .video-card {
+      width: 45%;
+      min-width: 280px;
+      max-width: 520px;
+    }
+
+    .video-label {
+      font-size: 14px;
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    video {
+      width: 100%;
+      background: black;
+      border-radius: 12px;
+    }
+
+    #local-video {
+      transform: scaleX(-1);
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 14px;
+      opacity: 0.85;
+    }
+  </style>
 </head>
-
 <body>
 
-<h2>Strive-Ops Coaching</h2>
+  <h2>Strive-Ops Coaching</h2>
 
-<p>Your ID:</p>
-<b id="my-id">Connecting...</b>
+  <p>Your ID:</p>
+  <b id="my-id">Connecting...</b>
 
-<br><br>
+  <div class="controls">
+    <button id="join-btn">Enable Camera & Mic</button>
+  </div>
 
-<input id="remote-id" placeholder="Enter ID">
-<button onclick="startCall()">Connect</button>
+  <div class="controls">
+    <input id="remote-id" placeholder="Enter remote ID">
+    <button onclick="startCall()">Connect</button>
+  </div>
 
-<br><br>
+  <div id="status">Waiting to enable camera and microphone...</div>
 
-<div>
-    <video id="local-video" autoplay muted playsinline></video>
-    <video id="remote-video" autoplay playsinline></video>
-</div>
+  <div class="video-wrap">
+    <div class="video-card">
+      <div class="video-label">You</div>
+      <video id="local-video" autoplay muted playsinline></video>
+    </div>
 
-<!-- 🔥 CACHE BUSTER (IMPORTANT) -->
-<script src="app.js?v=1"></script>
+    <div class="video-card">
+      <div class="video-label">Remote</div>
+      <video id="remote-video" autoplay playsinline></video>
+    </div>
+  </div>
 
+  <script src="app.js?v=2"></script>
 </body>
 </html>
