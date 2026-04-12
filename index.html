@@ -586,31 +586,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font
 
 <!-- ══ AI COACHING FORM MODAL ════════════════════════════════ -->
 <div class="overlay" id="form-ov">
-<div class="modal" style="max-width:540px">
+<div class="modal" style="max-width:520px">
   <div class="mhd"><div class="mtitle">📋 SMART Coaching Report</div><button class="mx" onclick="CO('form-ov')">×</button></div>
-  <!-- BRANDING SWITCHER -->
-  <div style="padding:10px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg3)">
-    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);white-space:nowrap">Report Brand:</div>
-    <div style="display:flex;gap:6px;flex:1;flex-wrap:wrap">
-      <button id="brand-striveops" onclick="setBrand('striveops')"
-        style="padding:4px 12px;border-radius:7px;border:1px solid rgba(45,212,191,.3);background:var(--adim);color:var(--ac);font-family:var(--fu);font-size:12px;font-weight:700;cursor:pointer">
-        Strive-Ops
-      </button>
-      <button id="brand-employer" onclick="setBrand('employer')"
-        style="padding:4px 12px;border-radius:7px;border:1px solid var(--bd);background:var(--bg4);color:var(--t2);font-family:var(--fu);font-size:12px;font-weight:600;cursor:pointer">
-        Current Employer
-      </button>
-    </div>
-    <div id="employer-name-wrap" style="display:none;flex:1;min-width:160px">
-      <input id="employer-name-in" placeholder="Company name…"
-        style="width:100%;padding:5px 10px;border-radius:7px;border:1px solid var(--bd);background:var(--bg0);color:var(--t1);font-family:var(--fu);font-size:12px;outline:none"/>
-    </div>
-  </div>
   <div class="mbody" id="form-body">
-    <div style="font-size:12px;color:var(--t3);text-align:center">Click "Generate Form" in the AI panel to populate from transcript.</div>
+    <div style="font-size:12px;color:var(--t3);text-align:center">Generating form from transcript…</div>
   </div>
-  <div style="padding:12px 20px;border-top:1px solid var(--bd);display:flex;gap:8px;flex-wrap:wrap">
-    <button class="mbtn ac" style="width:auto;padding:9px 18px" onclick="exportPDF()">📄 Export / Print PDF</button>
+  <div style="padding:12px 20px;border-top:1px solid var(--bd);display:flex;gap:8px">
+    <button class="mbtn ac" style="width:auto;padding:9px 18px" onclick="exportPDF()">📄 Export PDF</button>
     <button class="mbtn" style="width:auto;padding:9px 18px" onclick="CO('form-ov')">Close</button>
   </div>
 </div>
@@ -787,35 +769,24 @@ function createPeer(){
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DATA CHANNEL — name exchange + chat + transcript sharing
+//  DATA CHANNEL — name exchange + chat
 // ═══════════════════════════════════════════════════════════════
 function setupDataConn(conn){
   conn.on("open",()=>{
     dataConn=conn;
+    // Always send our name immediately
     conn.send({type:"hello",name:myName});
-    // If transcript is already running, tell the remote peer
-    if(txActive) conn.send({type:"tx-status",active:true});
     updateMembers();
   });
   conn.on("data",d=>{
     if(!d)return;
     if(d.type==="hello"){
+      // Update remote name everywhere
       remoteName=d.name||"Peer";
       G("remote-tname").textContent=remoteName;
       updateMembers();
     }
     if(d.type==="chat") appendMsg({text:d.text,from:"them",who:remoteName||"Peer",ts:d.ts||Date.now()});
-    // Remote peer sent a transcript line from their own mic
-    if(d.type==="tx-line") appendTxLine({
-      speaker: d.speaker||remoteName||"Peer",
-      text: d.text,
-      ts: d.ts||Date.now(),
-      fromRemote: true
-    });
-    // Remote peer started/stopped their transcript
-    if(d.type==="tx-status"){
-      st(remoteName||"Peer"+" "+(d.active?"started":"stopped")+" transcription.");
-    }
   });
   conn.on("close",()=>{dataConn=null;remoteName="";G("remote-tname").textContent="Peer";updateMembers();});
 }
@@ -1230,7 +1201,7 @@ function mCard(id,name,mic,cam){
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  AI — TRANSCRIPT (Web Speech API + data channel sharing)
+//  AI — TRANSCRIPT (Web Speech API)
 // ═══════════════════════════════════════════════════════════════
 function toggleTranscript(){
   if(txActive){stopTranscript();}else{startTranscript();}
@@ -1239,59 +1210,48 @@ function toggleTranscript(){
 function startTranscript(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){st("Transcription not supported — use Chrome.");return;}
-
-  // Make sure AI panel is open so they can see it
-  if(activePanel!=="ai") togglePanel("ai");
-
   recognition=new SR();
   recognition.continuous=true;
   recognition.interimResults=true;
   recognition.lang="en-US";
   G("ai-empty").style.display="none";
-
-  // Interim placeholder for live typing effect
+  // Add interim line placeholder
   txInterimEl=document.createElement("div");
   txInterimEl.className="tx-line";
-  const shortName=(myName||"You").split(" ")[0];
-  txInterimEl.innerHTML=`<div class="tx-spk" style="color:var(--ac)">${esc(shortName)}</div><div class="tx-text tx-interim" id="tx-interim-text">…</div>`;
+  txInterimEl.innerHTML=`<div class="tx-spk">${(myName||"You").split(" ")[0]}</div><div class="tx-text tx-interim" id="tx-interim-text">…</div>`;
   G("tx-wrap").appendChild(txInterimEl);
-
   recognition.onresult=e=>{
     let interim="", final="";
     for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) final+=e.results[i][0].transcript;
-      else interim+=e.results[i][0].transcript;
+      if(e.results[i].isFinal){final+=e.results[i][0].transcript;}
+      else{interim+=e.results[i][0].transcript;}
     }
-    if(final.trim()){
+    if(final){
       const entry={speaker:myName||"You",text:final.trim(),ts:Date.now()};
-      // Add to local transcript array
       transcript.push(entry);
-      // Render locally
-      appendTxLine(entry);
-      // Share with remote peer over data channel
-      if(dataConn?.open){
-        dataConn.send({type:"tx-line",speaker:myName||"You",text:entry.text,ts:entry.ts});
-      }
+      // Add permanent line before interim placeholder
+      const line=document.createElement("div");
+      line.className="tx-line";
+      const t=new Date(entry.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+      line.innerHTML=`<div class="tx-spk">${esc(entry.speaker.split(" ")[0])}</div><div class="tx-text">${esc(entry.text)}</div><div class="tx-time">${t}</div>`;
+      G("tx-wrap").insertBefore(line,txInterimEl);
     }
-    if(txInterimEl) G("tx-interim-text").textContent=interim||"…";
+    if(txInterimEl)G("tx-interim-text").textContent=interim||"…";
     G("tx-wrap").scrollTop=G("tx-wrap").scrollHeight;
   };
-
   recognition.onerror=e=>{
-    if(e.error!=="no-speech") st("Transcript error: "+e.error);
+    if(e.error!=="no-speech")st("Transcript error: "+e.error);
   };
   recognition.onend=()=>{
-    if(txActive) recognition.start(); // auto-restart on Chrome timeout
+    // Auto-restart if still active (handles browser timeouts)
+    if(txActive)recognition.start();
   };
-
   recognition.start();
   txActive=true;
   G("btn-rec").textContent="⏹ Stop Transcript";
   G("btn-rec").classList.add("rec");
   G("btn-ai").classList.add("recording");
-  // Notify remote peer that transcription has started
-  if(dataConn?.open) dataConn.send({type:"tx-status",active:true});
-  st("Transcription active — both sides will be captured if peer also starts transcript.");
+  st("Transcription active — recording your voice.");
 }
 
 function stopTranscript(){
@@ -1301,30 +1261,7 @@ function stopTranscript(){
   G("btn-rec").textContent="🎙 Start Transcript";
   G("btn-rec").classList.remove("rec");
   G("btn-ai").classList.remove("recording");
-  if(dataConn?.open) dataConn.send({type:"tx-status",active:false});
-  st("Transcription stopped — "+transcript.length+" lines captured.");
-}
-
-// Shared function — renders any transcript line (local or remote)
-function appendTxLine(entry){
-  G("ai-empty").style.display="none";
-  const wrap=G("tx-wrap");
-  const line=document.createElement("div");
-  line.className="tx-line";
-  const t=new Date(entry.ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-  const shortName=entry.speaker.split(" ")[0];
-  // Local speaker = accent color, remote = amber so they're visually distinct
-  const color=entry.fromRemote?"var(--amb)":"var(--ac)";
-  line.innerHTML=`<div class="tx-spk" style="color:${color}">${esc(shortName)}</div><div class="tx-text">${esc(entry.text)}</div><div class="tx-time">${t}</div>`;
-  // Insert before interim placeholder if it exists, otherwise append
-  if(txInterimEl && wrap.contains(txInterimEl)){
-    wrap.insertBefore(line,txInterimEl);
-  } else {
-    wrap.appendChild(line);
-  }
-  // Also add remote lines to local transcript array for form generation
-  if(entry.fromRemote) transcript.push({speaker:entry.speaker,text:entry.text,ts:entry.ts});
-  wrap.scrollTop=wrap.scrollHeight;
+  st("Transcription stopped. "+transcript.length+" lines captured.");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1475,14 +1412,9 @@ function exportPDF(){
   });
   if(keys.every(k=>!f[k])){st("Fill in or generate the form first.");return;}
 
-  const e=v=>String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const fmtDate=d=>{if(!d)return"—";try{return new Date(d+"T12:00:00").toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});}catch{return d;}};
+  const e=v=>String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const row=(lbl,val)=>`<tr><td class="lc">${lbl}</td><td>${e(val)||"—"}</td></tr>`;
-  const brandLabel=getBrandLabel();
-  const isStriveOps=activeBrand==="striveops";
-  const brandHtml=isStriveOps
-    ?`<div class="hdr-brand">Strive<em>-Ops</em></div>`
-    :`<div class="hdr-brand" style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;color:#1a3a5c">${e(brandLabel)}</div>`;
 
   const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>SMART Coaching Report — ${e(f.expertName||"Session")}</title>
@@ -1516,7 +1448,7 @@ tr:nth-child(even) td:not(.lc){background:#f5f8fd;-webkit-print-color-adjust:exa
 </style></head><body>
 <div class="wrap">
   <div class="hdr">
-    ${brandHtml}
+    <div class="hdr-brand">Strive<em>-Ops</em></div>
     <div class="hdr-title">SMART Coaching Report</div>
     <div class="hdr-date">${fmtDate(f.coachingDate)}</div>
   </div>
@@ -1580,31 +1512,8 @@ function saveTranscript(){
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  BRANDING SWITCHER
+//  SESSION SETTINGS
 // ═══════════════════════════════════════════════════════════════
-let activeBrand="striveops";
-
-function setBrand(b){
-  activeBrand=b;
-  const sBtn=G("brand-striveops"), eBtn=G("brand-employer"), wrap=G("employer-name-wrap");
-  if(b==="striveops"){
-    sBtn.style.background="var(--adim)";sBtn.style.color="var(--ac)";sBtn.style.borderColor="rgba(45,212,191,.3)";
-    eBtn.style.background="var(--bg4)";eBtn.style.color="var(--t2)";eBtn.style.borderColor="var(--bd)";
-    wrap.style.display="none";
-  } else {
-    eBtn.style.background="var(--adim)";eBtn.style.color="var(--ac)";eBtn.style.borderColor="rgba(45,212,191,.3)";
-    sBtn.style.background="var(--bg4)";sBtn.style.color="var(--t2)";sBtn.style.borderColor="var(--bd)";
-    wrap.style.display="block";
-    setTimeout(()=>G("employer-name-in").focus(),50);
-  }
-}
-
-function getBrandLabel(){
-  if(activeBrand==="employer"){
-    return G("employer-name-in").value.trim()||"Current Employer";
-  }
-  return"Strive-Ops";
-}
 function applyName(){const n=G("sname-in").value.trim();if(n)G("sname-el").textContent=n;st("Name updated.");}
 function applyPin(){
   const p=G("pin-in").value.trim();if(!/^\d{4,6}$/.test(p)){st("PIN must be 4–6 digits.");return;}
